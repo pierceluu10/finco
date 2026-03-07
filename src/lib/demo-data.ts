@@ -16,33 +16,109 @@ export const demoAccounts: Omit<Account, "id">[] = [
   { user_id: DEMO_USER_ID, name: "Visa Credit Card", type: "credit", current_balance: -1240 },
 ];
 
+// ---------------------------------------------------------------------------
+// Demo graph — distributed multi-cluster financial ecosystem
+// ---------------------------------------------------------------------------
+
 export const demoNodes: (Omit<FinancialNode, "id" | "user_id"> & { _id: string })[] = [
-  { _id: "salary", label: "Salary", type: "income", current_value: 8500, monthly_weight: 8500, metadata_json: { employer: "TechCorp Canada", frequency: "biweekly" } },
-  { _id: "chequing", label: "Chequing Account", type: "account", current_value: 4850, monthly_weight: 0, metadata_json: { institution: "TD Bank" } },
-  { _id: "mortgage", label: "Mortgage", type: "debt", current_value: 387000, monthly_weight: 2200, metadata_json: { rate: 5.14, remaining_years: 22, institution: "TD Bank" } },
+  // Income sources
+  { _id: "salary", label: "Salary", type: "income", current_value: 0, monthly_weight: 8500, metadata_json: { employer: "TechCorp Canada", frequency: "biweekly" } },
+  { _id: "side-income", label: "Side Income", type: "income", current_value: 0, monthly_weight: 1200, metadata_json: { source: "freelance consulting" } },
+  { _id: "dividends", label: "Dividends", type: "income", current_value: 0, monthly_weight: 180, metadata_json: { source: "ETF distributions" } },
+
+  // Accounts (hubs — but distributed, not one central node)
+  { _id: "chequing", label: "Chequing", type: "account", current_value: 4850, monthly_weight: 0, metadata_json: { institution: "TD Bank" } },
+  { _id: "joint-account", label: "Joint Account", type: "account", current_value: 2400, monthly_weight: 0, metadata_json: { institution: "TD Bank", shared: true } },
+  { _id: "savings-account", label: "Savings Account", type: "account", current_value: 11500, monthly_weight: 0, metadata_json: { institution: "TD Bank" } },
+  { _id: "credit-card", label: "Credit Card", type: "account", current_value: -1240, monthly_weight: 0, metadata_json: { institution: "TD Visa", limit: 8000 } },
+
+  // Housing cluster
+  { _id: "mortgage", label: "Mortgage", type: "debt", current_value: 387000, monthly_weight: 2200, metadata_json: { rate: 5.14, remaining_years: 22 } },
+  { _id: "property-tax", label: "Property Tax", type: "expense", current_value: 0, monthly_weight: 340, metadata_json: { annual: 4080 } },
+  { _id: "home-insurance", label: "Home Insurance", type: "expense", current_value: 0, monthly_weight: 95, metadata_json: { provider: "Intact" } },
+  { _id: "home-maintenance", label: "Home Maintenance", type: "expense", current_value: 0, monthly_weight: 150, metadata_json: {} },
+
+  // Daily living cluster
   { _id: "groceries", label: "Groceries", type: "expense", current_value: 0, monthly_weight: 600, metadata_json: { category: "food" } },
-  { _id: "utilities", label: "Utilities", type: "expense", current_value: 0, monthly_weight: 180, metadata_json: { includes: ["hydro", "gas", "internet", "phone"] } },
-  { _id: "car-payment", label: "Car Payment", type: "debt", current_value: 18500, monthly_weight: 450, metadata_json: { rate: 4.99, remaining_months: 41 } },
-  { _id: "subscriptions", label: "Subscriptions", type: "expense", current_value: 0, monthly_weight: 92, metadata_json: { services: ["Netflix", "Spotify", "iCloud", "Gym"] } },
   { _id: "dining", label: "Dining & Takeout", type: "expense", current_value: 0, monthly_weight: 280, metadata_json: {} },
-  { _id: "tfsa", label: "TFSA", type: "investment", current_value: 14200, monthly_weight: 500, metadata_json: { institution: "Wealthsimple", contribution_room: 6500 } },
+  { _id: "coffee", label: "Coffee", type: "expense", current_value: 0, monthly_weight: 65, metadata_json: { avg_per_visit: 5.5 } },
+
+  // Bills & recurring cluster
+  { _id: "utilities", label: "Utilities", type: "expense", current_value: 0, monthly_weight: 180, metadata_json: {} },
+  { _id: "hydro", label: "Hydro", type: "expense", current_value: 0, monthly_weight: 85, metadata_json: {} },
+  { _id: "internet", label: "Internet", type: "expense", current_value: 0, monthly_weight: 80, metadata_json: { provider: "Rogers" } },
+  { _id: "phone", label: "Phone Plan", type: "expense", current_value: 0, monthly_weight: 55, metadata_json: { provider: "Fido" } },
+  { _id: "subscriptions", label: "Subscriptions", type: "expense", current_value: 0, monthly_weight: 92, metadata_json: { services: ["Netflix", "Spotify", "iCloud", "Gym"] } },
+
+  // Transportation cluster
+  { _id: "car-payment", label: "Car Payment", type: "debt", current_value: 18500, monthly_weight: 450, metadata_json: { rate: 4.99, remaining_months: 41 } },
+  { _id: "gas", label: "Gas", type: "expense", current_value: 0, monthly_weight: 140, metadata_json: {} },
+  { _id: "auto-insurance", label: "Auto Insurance", type: "expense", current_value: 0, monthly_weight: 135, metadata_json: { provider: "Intact" } },
+  { _id: "parking", label: "Parking", type: "expense", current_value: 0, monthly_weight: 60, metadata_json: {} },
+
+  // Savings cluster
   { _id: "emergency", label: "Emergency Fund", type: "savings", current_value: 11500, monthly_weight: 300, metadata_json: { target: 25000 } },
-  { _id: "transport", label: "Transportation", type: "expense", current_value: 0, monthly_weight: 120, metadata_json: { includes: ["gas", "parking", "transit"] } },
-  { _id: "insurance", label: "Insurance", type: "expense", current_value: 0, monthly_weight: 185, metadata_json: { includes: ["home", "auto", "life"] } },
+  { _id: "vacation-fund", label: "Vacation Fund", type: "savings", current_value: 3200, monthly_weight: 200, metadata_json: { target: 6000 } },
+  { _id: "renovation-fund", label: "Renovation Fund", type: "savings", current_value: 2300, monthly_weight: 150, metadata_json: { target: 15000 } },
+
+  // Investment cluster
+  { _id: "tfsa", label: "TFSA", type: "investment", current_value: 14200, monthly_weight: 500, metadata_json: { institution: "Wealthsimple", contribution_room: 6500 } },
+  { _id: "rrsp", label: "RRSP", type: "investment", current_value: 22000, monthly_weight: 400, metadata_json: { institution: "Wealthsimple" } },
+  { _id: "etf-portfolio", label: "ETF Portfolio", type: "investment", current_value: 8500, monthly_weight: 0, metadata_json: { holdings: ["XEQT", "VFV", "ZAG"] } },
+
+  // Insurance cluster
+  { _id: "life-insurance", label: "Life Insurance", type: "expense", current_value: 0, monthly_weight: 45, metadata_json: { provider: "Sun Life" } },
 ];
 
 export const demoEdges: { source: string; target: string; amount: number; frequency: "monthly" | "biweekly" }[] = [
-  { source: "salary", target: "chequing", amount: 8500, frequency: "monthly" },
-  { source: "chequing", target: "mortgage", amount: 2200, frequency: "monthly" },
+  // Income → accounts
+  { source: "salary", target: "chequing", amount: 7000, frequency: "monthly" },
+  { source: "salary", target: "joint-account", amount: 1500, frequency: "monthly" },
+  { source: "side-income", target: "savings-account", amount: 1200, frequency: "monthly" },
+  { source: "dividends", target: "tfsa", amount: 180, frequency: "monthly" },
+
+  // Chequing → expenses
   { source: "chequing", target: "groceries", amount: 600, frequency: "monthly" },
-  { source: "chequing", target: "utilities", amount: 180, frequency: "monthly" },
-  { source: "chequing", target: "car-payment", amount: 450, frequency: "monthly" },
-  { source: "chequing", target: "subscriptions", amount: 92, frequency: "monthly" },
   { source: "chequing", target: "dining", amount: 280, frequency: "monthly" },
+  { source: "chequing", target: "subscriptions", amount: 92, frequency: "monthly" },
+  { source: "chequing", target: "car-payment", amount: 450, frequency: "monthly" },
+  { source: "chequing", target: "gas", amount: 140, frequency: "monthly" },
+  { source: "chequing", target: "phone", amount: 55, frequency: "monthly" },
+  { source: "chequing", target: "credit-card", amount: 400, frequency: "monthly" },
+
+  // Joint account → housing cluster
+  { source: "joint-account", target: "mortgage", amount: 2200, frequency: "monthly" },
+  { source: "joint-account", target: "property-tax", amount: 340, frequency: "monthly" },
+  { source: "joint-account", target: "home-insurance", amount: 95, frequency: "monthly" },
+  { source: "joint-account", target: "home-maintenance", amount: 150, frequency: "monthly" },
+  { source: "joint-account", target: "utilities", amount: 180, frequency: "monthly" },
+
+  // Utilities → sub-expenses
+  { source: "utilities", target: "hydro", amount: 85, frequency: "monthly" },
+  { source: "utilities", target: "internet", amount: 80, frequency: "monthly" },
+
+  // Credit card → small daily expenses
+  { source: "credit-card", target: "coffee", amount: 65, frequency: "monthly" },
+  { source: "credit-card", target: "parking", amount: 60, frequency: "monthly" },
+
+  // Chequing → savings
+  { source: "chequing", target: "savings-account", amount: 650, frequency: "monthly" },
+
+  // Savings account → savings buckets
+  { source: "savings-account", target: "emergency", amount: 300, frequency: "monthly" },
+  { source: "savings-account", target: "vacation-fund", amount: 200, frequency: "monthly" },
+  { source: "savings-account", target: "renovation-fund", amount: 150, frequency: "monthly" },
+
+  // Chequing → investments
   { source: "chequing", target: "tfsa", amount: 500, frequency: "monthly" },
-  { source: "chequing", target: "emergency", amount: 300, frequency: "monthly" },
-  { source: "chequing", target: "transport", amount: 120, frequency: "monthly" },
-  { source: "chequing", target: "insurance", amount: 185, frequency: "monthly" },
+  { source: "chequing", target: "rrsp", amount: 400, frequency: "monthly" },
+
+  // Investment → sub-holdings
+  { source: "tfsa", target: "etf-portfolio", amount: 500, frequency: "monthly" },
+
+  // Insurance (from chequing)
+  { source: "chequing", target: "auto-insurance", amount: 135, frequency: "monthly" },
+  { source: "chequing", target: "life-insurance", amount: 45, frequency: "monthly" },
 ];
 
 export const demoTransactions: Omit<Transaction, "id" | "user_id" | "account_id">[] = [
@@ -66,9 +142,7 @@ export const demoTransactions: Omit<Transaction, "id" | "user_id" | "account_id"
   { label: "Emergency Fund Transfer", category: "savings", amount: -300, date: "2026-03-01", is_recurring: true },
   { label: "Shell Gas", category: "transport", amount: -68.40, date: "2026-03-02", is_recurring: false },
   { label: "Intact Insurance", category: "insurance", amount: -185, date: "2026-03-01", is_recurring: true },
-  // Anomaly: unusually large restaurant bill
   { label: "Alo Restaurant", category: "dining", amount: -387.50, date: "2026-02-14", is_recurring: false },
-  // Anomaly: duplicate subscription
   { label: "Netflix", category: "subscription", amount: -16.49, date: "2026-02-15", is_recurring: true },
   { label: "Petro Canada", category: "transport", amount: -72.15, date: "2026-02-20", is_recurring: false },
   { label: "Shoppers Drug Mart", category: "personal", amount: -34.89, date: "2026-03-03", is_recurring: false },
@@ -90,19 +164,20 @@ export const demoAlerts: Omit<Alert, "id" | "user_id" | "created_at">[] = [
 ];
 
 export function getDemoFinancialSummary() {
-  const monthlyIncome = 8500;
-  const monthlyExpenses = 2200 + 600 + 180 + 450 + 92 + 280 + 500 + 300 + 120 + 185;
-  const monthlySurplus = monthlyIncome - monthlyExpenses;
-  const totalLiquid = 4850 + 11500;
-  const cashBufferDays = Math.floor(totalLiquid / (monthlyExpenses / 30));
+  const monthlyIncome = 8500 + 1200 + 180;
+  const monthlyExpenses = 2200 + 340 + 95 + 150 + 600 + 280 + 65 + 180 + 92 + 450 + 140 + 135 + 60 + 55 + 45;
+  const monthlySavings = 300 + 200 + 150;
+  const monthlyInvestments = 500 + 400;
+  const monthlySurplus = monthlyIncome - monthlyExpenses - monthlySavings - monthlyInvestments;
+  const totalLiquid = 4850 + 2400 + 11500;
 
   return {
-    total_balance: 4850 + 11500 + 14200 - 387000 - 1240 - 18500,
+    total_balance: totalLiquid + 14200 + 22000 + 8500 - 387000 - 1240 - 18500,
     net_liquid: totalLiquid,
     monthly_income: monthlyIncome,
     monthly_expenses: monthlyExpenses,
     monthly_surplus: monthlySurplus,
-    cash_buffer_days: cashBufferDays,
+    cash_buffer_days: Math.floor(totalLiquid / (monthlyExpenses / 30)),
     emergency_fund: 11500,
   };
 }

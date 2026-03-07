@@ -1,8 +1,9 @@
 "use client";
 
-import { getNodeColor } from "@/lib/utils";
+import { getNodeColor } from "@/lib/graph-theme";
+import type { FinancialNodeType } from "@/types/graph";
 
-const categories = [
+const categories: { type: FinancialNodeType; label: string }[] = [
   { type: "income", label: "Income" },
   { type: "account", label: "Account" },
   { type: "expense", label: "Expense" },
@@ -13,14 +14,14 @@ const categories = [
 
 export function GraphLegend() {
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-white/5 bg-card/80 px-4 py-2 backdrop-blur-sm">
+    <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-zinc-950/80 backdrop-blur-sm px-3 py-1.5">
       {categories.map((cat) => (
         <div key={cat.type} className="flex items-center gap-1.5">
           <div
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ background: getNodeColor(cat.type) }}
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: getNodeColor(cat.type), opacity: 0.8 }}
           />
-          <span className="text-xs text-muted-foreground">{cat.label}</span>
+          <span className="text-[10px] text-zinc-500">{cat.label}</span>
         </div>
       ))}
     </div>

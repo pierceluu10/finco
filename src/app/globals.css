@@ -89,3 +89,26 @@ body {
     transparent 60%
   );
 }
+
+/* React Flow overrides */
+.finco-graph .react-flow__pane {
+  cursor: grab;
+}
+.finco-graph .react-flow__pane:active {
+  cursor: grabbing;
+}
+.finco-graph .react-flow__node {
+  cursor: pointer;
+}
+.finco-graph .react-flow__node:focus,
+.finco-graph .react-flow__node:focus-visible,
+.finco-graph .react-flow__node.selected {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.finco-graph .react-flow__edge {
+  cursor: pointer;
+}
+.finco-graph .react-flow__handle {
+  pointer-events: none;
+}
