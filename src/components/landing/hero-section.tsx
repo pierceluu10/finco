@@ -107,15 +107,15 @@ export function HeroSection() {
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="rounded-full"
           >
-            <Link
-              href="/signup"
+            <a
+              href="/auth/login?screen_hint=signup"
               className="inline-flex h-[49px] items-center justify-center gap-2 rounded-full bg-finco-blue px-[34px] font-display text-[16px] font-medium text-black transition-colors hover:bg-finco-blue/90"
             >
               Get Started
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M3.5 10.5L10.5 3.5M10.5 3.5H4.5M10.5 3.5V9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </Link>
+            </a>
           </motion.div>
         </motion.div>
       </div>

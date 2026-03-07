@@ -54,13 +54,13 @@ export function AppSidebar() {
           <Settings className="h-4 w-4" />
           Settings
         </Link>
-        <Link
-          href="/"
+        <a
+          href="/auth/logout"
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
         >
           <LogOut className="h-4 w-4" />
           Sign Out
-        </Link>
+        </a>
       </div>
     </aside>
   );
