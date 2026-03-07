@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LoginPage() {
-  redirect("/auth/login");
+  redirect("/auth/login?returnTo=/ecosystem");
 }

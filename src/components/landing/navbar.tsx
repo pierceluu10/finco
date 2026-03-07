@@ -13,7 +13,7 @@ export function Navbar() {
         </Link>
         <div className="flex w-[80px] justify-end">
           <a
-            href="/auth/login"
+            href="/auth/login?returnTo=/ecosystem"
             className="inline-flex h-[40px] items-center justify-center rounded-full bg-finco-blue px-6 text-sm font-bold text-black transition-colors hover:bg-finco-blue/90"
           >
             Login
