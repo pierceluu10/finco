@@ -17,18 +17,25 @@ function FinancialEdgeComponent({
   markerEnd,
 }: EdgeProps<EdgeRfData>) {
   const [hovered, setHovered] = useState(false);
-  const isActive = selected || hovered;
+  const dimmed = data?.dimmed ?? false;
+  const isActive = (selected || hovered) && !dimmed;
 
   const edgePath = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
   const labelX = (sourceX + targetX) / 2;
   const labelY = (sourceY + targetY) / 2;
 
+  const strokeColor = dimmed
+    ? "rgba(127, 127, 250, 0.04)"
+    : isActive
+      ? EDGE_COLOR_ACTIVE
+      : EDGE_COLOR_DEFAULT;
+
   return (
     <g
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      style={{ opacity: dimmed ? 0.15 : 1, transition: "opacity 0.4s ease" }}
     >
-      {/* Wider invisible hit area */}
       <path
         d={edgePath}
         fill="none"
@@ -43,9 +50,9 @@ function FinancialEdgeComponent({
         fill="none"
         markerEnd={markerEnd as string}
         style={{
-          stroke: isActive ? EDGE_COLOR_ACTIVE : EDGE_COLOR_DEFAULT,
+          stroke: strokeColor,
           strokeWidth: isActive ? 2 : 1.5,
-          transition: "stroke 0.15s, stroke-width 0.15s",
+          transition: "stroke 0.3s, stroke-width 0.15s",
         }}
       />
 

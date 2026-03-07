@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import * as Tabs from "@radix-ui/react-tabs";
-import { BarChart3, Bot, Compass, Settings, LogOut } from "lucide-react";
+import { BarChart3, Bot, Compass, Settings, LogOut, BookOpen } from "lucide-react";
 import { FincoLogo } from "./logo";
 import { formatCurrency } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ interface SidebarProps {
   totalExpenses?: number;
   nodeCount?: number;
   flowCount?: number;
+  onOpenLibrarian?: () => void;
 }
 
 export function AppSidebar({
@@ -19,6 +20,7 @@ export function AppSidebar({
   totalExpenses = 0,
   nodeCount = 0,
   flowCount = 0,
+  onOpenLibrarian,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const netFlow = totalIncome - totalExpenses;
@@ -47,11 +49,11 @@ export function AppSidebar({
             Overview
           </Tabs.Trigger>
           <Tabs.Trigger
-            value="ai"
+            value="agents"
             className="flex items-center gap-1.5 rounded-t-md px-2.5 py-1.5 text-[11px] font-medium text-zinc-500 transition data-[state=active]:text-zinc-200 data-[state=active]:bg-white/5"
           >
             <Bot className="h-3 w-3" />
-            AI
+            Agents
           </Tabs.Trigger>
           <Tabs.Trigger
             value="explore"
@@ -91,23 +93,57 @@ export function AppSidebar({
           </div>
         </Tabs.Content>
 
-        {/* AI tab */}
+        {/* Agents tab */}
         <Tabs.Content
-          value="ai"
+          value="agents"
           className="flex-1 overflow-y-auto p-4 space-y-3"
         >
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Ask the Finco Strategist about your financial map. Get insights,
-            warnings, and recommendations.
+          <p className="text-[10px] uppercase tracking-wider text-zinc-600">
+            Available Agents
           </p>
-          <textarea
-            placeholder="e.g. Can I afford a $500/mo car payment?"
-            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 resize-none h-20 focus:border-white/20 focus:outline-none focus:ring-0"
-          />
-          <button className="w-full rounded-lg bg-finco-blue/20 py-2 text-xs font-medium text-finco-blue hover:bg-finco-blue/30 transition">
-            Ask Strategist
+
+          {/* Librarian agent card */}
+          <button
+            onClick={onOpenLibrarian}
+            className="w-full rounded-lg border border-white/5 bg-zinc-900/50 p-3 text-left transition hover:border-finco-blue/20 hover:bg-zinc-900 group"
+          >
+            <div className="flex items-start gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finco-blue/15 group-hover:bg-finco-blue/25 transition">
+                <BookOpen className="h-3.5 w-3.5 text-finco-blue" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-zinc-200">Librarian</p>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-500">
+                  Ask questions about your financial graph. References your
+                  actual nodes, flows, and numbers.
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 pl-[38px]">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80" />
+              <span className="text-[9px] text-zinc-600">Graph-aware</span>
+            </div>
           </button>
-          <p className="text-[10px] text-zinc-600 text-center">
+
+          {/* Strategist placeholder */}
+          <div className="w-full rounded-lg border border-white/5 bg-zinc-900/30 p-3 opacity-50">
+            <div className="flex items-start gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5">
+                <Bot className="h-3.5 w-3.5 text-zinc-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-zinc-400">Strategist</p>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
+                  Scenario planning, forecasts, and what-if simulations.
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 pl-[38px]">
+              <span className="text-[9px] text-zinc-700">Coming soon</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-zinc-600 text-center pt-1">
             Powered by Gemini
           </p>
         </Tabs.Content>

@@ -9,6 +9,15 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "reactflow";
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCollide,
+  type Simulation,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
+} from "d3-force";
 import type {
   FinancialNodeData,
   FinancialFlowData,
@@ -20,52 +29,66 @@ import { computeForceLayout } from "@/lib/graph-layout";
 import {
   toReactFlowNodes,
   toReactFlowEdges,
-  computeNodeRadius,
+  computeAllRadii,
+  getNodeFinancialWeight,
 } from "@/lib/graph-transforms";
 
 const CANVAS_W = 1800;
 const CANVAS_H = 1200;
 
+interface SimNode extends SimulationNodeDatum {
+  id: string;
+  radius: number;
+}
+
 export function useFinancialGraph(
   initialNodes: FinancialNodeData[],
   initialFlows: FinancialFlowData[]
 ) {
-  // ---- Domain state (source of truth) ----
   const [financialNodes, setFinancialNodes] =
     useState<FinancialNodeData[]>(initialNodes);
   const [financialFlows, setFinancialFlows] =
     useState<FinancialFlowData[]>(initialFlows);
 
-  // ---- Layout persistence ----
   const pinnedRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const layoutRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevStructureRef = useRef<string>("");
 
-  // ---- React Flow state ----
   const [rfNodes, setRfNodes, onRfNodesChange] = useNodesState<NodeRfData>([]);
   const [rfEdges, setRfEdges, onRfEdgesChange] = useEdgesState<EdgeRfData>([]);
 
-  // ---- Selection state ----
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-  // ---- Node map for quick lookup ----
   const nodeMap = useMemo(() => {
     const m = new Map<string, FinancialNodeData>();
     for (const n of financialNodes) m.set(n.id, n);
     return m;
   }, [financialNodes]);
 
-  // ---- Sync domain → RF, relayout ONLY on structural changes ----
+  const radiiMap = useMemo(() => computeAllRadii(financialNodes), [financialNodes]);
+
+  // IDs of nodes directly connected to the selected node
+  const connectedNodeIds = useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+    const ids = new Set<string>();
+    ids.add(selectedNodeId);
+    for (const f of financialFlows) {
+      if (f.source === selectedNodeId) ids.add(f.target);
+      if (f.target === selectedNodeId) ids.add(f.source);
+    }
+    return ids;
+  }, [selectedNodeId, financialFlows]);
+
+  // ---- Physics simulation refs ----
+  const simulationRef = useRef<Simulation<SimNode, SimulationLinkDatum<SimNode>> | null>(null);
+  const simNodesRef = useRef<SimNode[]>([]);
+  const draggingIdRef = useRef<string | null>(null);
+
+  // ---- Sync domain → RF + init physics sim on structure change ----
   useEffect(() => {
-    const nodeIds = financialNodes
-      .map((n) => n.id)
-      .sort()
-      .join(",");
-    const flowIds = financialFlows
-      .map((f) => f.id)
-      .sort()
-      .join(",");
+    const nodeIds = financialNodes.map((n) => n.id).sort().join(",");
+    const flowIds = financialFlows.map((f) => f.id).sort().join(",");
     const structureKey = `${nodeIds}|${flowIds}`;
     const structureChanged = structureKey !== prevStructureRef.current;
 
@@ -73,7 +96,7 @@ export function useFinancialGraph(
       const layoutInput = financialNodes.map((n) => ({
         id: n.id,
         type: n.type,
-        radius: computeNodeRadius(n.monthlyFlow),
+        radius: radiiMap.get(n.id) ?? 30,
       }));
       const layoutLinks = financialFlows.map((f) => ({
         source: f.source,
@@ -90,41 +113,155 @@ export function useFinancialGraph(
       prevStructureRef.current = structureKey;
     }
 
-    setRfNodes(toReactFlowNodes(financialNodes, layoutRef.current));
-    setRfEdges(toReactFlowEdges(financialFlows, nodeMap));
-  }, [financialNodes, financialFlows, nodeMap, setRfNodes, setRfEdges]);
+    const simNodes: SimNode[] = financialNodes.map((n) => {
+      const pos = layoutRef.current.get(n.id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+      return {
+        id: n.id,
+        radius: radiiMap.get(n.id) ?? 30,
+        x: pos.x,
+        y: pos.y,
+        vx: 0,
+        vy: 0,
+      };
+    });
 
-  // ---- Track user drags (derive radius from domain data, not RF state) ----
+    const simLinks: SimulationLinkDatum<SimNode>[] = financialFlows.map((f) => ({
+      source: f.source,
+      target: f.target,
+    }));
+
+    simulationRef.current?.stop();
+
+    const sim = forceSimulation<SimNode>(simNodes)
+      .force(
+        "link",
+        forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
+          .id((d) => d.id)
+          .distance(140)
+          .strength(0.3)
+      )
+      .force("charge", forceManyBody<SimNode>().strength(-300))
+      .force(
+        "collide",
+        forceCollide<SimNode>()
+          .radius((d) => d.radius + 24)
+          .strength(0.8)
+      )
+      .velocityDecay(0.35)
+      .alphaDecay(0.025)
+      .on("tick", () => {
+        const dragId = draggingIdRef.current;
+        setRfNodes((prev) =>
+          prev.map((rfNode) => {
+            if (rfNode.id === dragId) return rfNode;
+            const simNode = simNodesRef.current.find((s) => s.id === rfNode.id);
+            if (!simNode || simNode.x == null || simNode.y == null) return rfNode;
+            return {
+              ...rfNode,
+              position: {
+                x: simNode.x - rfNode.data.radius,
+                y: simNode.y - rfNode.data.radius,
+              },
+            };
+          })
+        );
+      })
+      .alpha(0)
+      .stop();
+
+    simulationRef.current = sim;
+    simNodesRef.current = simNodes;
+
+    setRfNodes(toReactFlowNodes(financialNodes, layoutRef.current, radiiMap));
+    setRfEdges(toReactFlowEdges(financialFlows, nodeMap));
+
+    return () => { sim.stop(); };
+  }, [financialNodes, financialFlows, nodeMap, radiiMap, setRfNodes, setRfEdges]);
+
+  // ---- Apply dimming when selection changes ----
+  useEffect(() => {
+    setRfNodes((prev) =>
+      prev.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          dimmed: selectedNodeId ? !connectedNodeIds.has(n.id) : false,
+        },
+      }))
+    );
+    setRfEdges((prev) =>
+      prev.map((e) => ({
+        ...e,
+        data: {
+          ...e.data,
+          dimmed: selectedNodeId
+            ? e.source !== selectedNodeId && e.target !== selectedNodeId
+            : false,
+        },
+      }))
+    );
+  }, [selectedNodeId, connectedNodeIds, setRfNodes, setRfEdges]);
+
+  // ---- React Flow change handlers ----
   const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      for (const change of changes) {
-        if (change.type === "position" && change.position && change.id) {
-          const domainNode = nodeMap.get(change.id);
-          if (domainNode) {
-            const r = computeNodeRadius(domainNode.monthlyFlow);
-            pinnedRef.current.set(change.id, {
-              x: change.position.x + r,
-              y: change.position.y + r,
-            });
-          }
-        }
-      }
-      onRfNodesChange(changes);
-    },
-    [onRfNodesChange, nodeMap]
+    (changes: NodeChange[]) => { onRfNodesChange(changes); },
+    [onRfNodesChange]
   );
 
   const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      onRfEdgesChange(changes);
-    },
+    (changes: EdgeChange[]) => { onRfEdgesChange(changes); },
     [onRfEdgesChange]
+  );
+
+  // ---- Physics drag handlers ----
+  const handleNodeDragStart = useCallback(
+    (_: React.MouseEvent, node: Node<NodeRfData>) => {
+      draggingIdRef.current = node.id;
+      const simNode = simNodesRef.current.find((s) => s.id === node.id);
+      if (simNode) {
+        simNode.fx = node.position.x + node.data.radius;
+        simNode.fy = node.position.y + node.data.radius;
+      }
+      simulationRef.current?.alpha(0.3).restart();
+    },
+    []
+  );
+
+  const handleNodeDrag = useCallback(
+    (_: React.MouseEvent, node: Node<NodeRfData>) => {
+      const simNode = simNodesRef.current.find((s) => s.id === node.id);
+      if (simNode) {
+        simNode.fx = node.position.x + node.data.radius;
+        simNode.fy = node.position.y + node.data.radius;
+      }
+      const sim = simulationRef.current;
+      if (sim && sim.alpha() < 0.1) sim.alpha(0.1);
+    },
+    []
+  );
+
+  const handleNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node<NodeRfData>) => {
+      const simNode = simNodesRef.current.find((s) => s.id === node.id);
+      if (simNode) {
+        simNode.fx = undefined;
+        simNode.fy = undefined;
+      }
+      draggingIdRef.current = null;
+      for (const sn of simNodesRef.current) {
+        if (sn.x != null && sn.y != null) {
+          pinnedRef.current.set(sn.id, { x: sn.x, y: sn.y });
+          layoutRef.current.set(sn.id, { x: sn.x, y: sn.y });
+        }
+      }
+    },
+    []
   );
 
   // ---- Selection handlers ----
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<NodeRfData>) => {
-      setSelectedNodeId(node.id);
+      setSelectedNodeId((prev) => (prev === node.id ? null : node.id));
       setSelectedEdgeId(null);
     },
     []
@@ -143,7 +280,11 @@ export function useFinancialGraph(
     setSelectedEdgeId(null);
   }, []);
 
-  // ---- CRUD: Add node ----
+  const deselectNode = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+
+  // ---- CRUD ----
   const addNode = useCallback(
     (
       data: Omit<FinancialNodeData, "id">,
@@ -156,7 +297,6 @@ export function useFinancialGraph(
     ) => {
       const id = `node-${Date.now()}`;
       const newNode: FinancialNodeData = { id, ...data };
-
       const newFlows: FinancialFlowData[] = connections.map((c, i) => ({
         id: `flow-${id}-${i}-${Date.now()}`,
         source: c.direction === "to" ? id : c.targetId,
@@ -164,7 +304,6 @@ export function useFinancialGraph(
         amount: c.amount,
         frequency: c.frequency,
       }));
-
       setFinancialNodes((prev) => [...prev, newNode]);
       setFinancialFlows((prev) => [...prev, ...newFlows]);
       return id;
@@ -172,7 +311,6 @@ export function useFinancialGraph(
     []
   );
 
-  // ---- CRUD: Update node ----
   const updateNode = useCallback(
     (id: string, updates: Partial<Omit<FinancialNodeData, "id">>) => {
       setFinancialNodes((prev) =>
@@ -182,19 +320,15 @@ export function useFinancialGraph(
     []
   );
 
-  // ---- CRUD: Delete node (with impact analysis) ----
   const getDeletionImpact = useCallback(
     (nodeId: string): DeletionImpact | null => {
       const node = nodeMap.get(nodeId);
       if (!node) return null;
-
       const inbound = financialFlows.filter((f) => f.target === nodeId);
       const outbound = financialFlows.filter((f) => f.source === nodeId);
-
       const neighborIds = new Set<string>();
       for (const f of inbound) neighborIds.add(f.source);
       for (const f of outbound) neighborIds.add(f.target);
-
       const remainingFlows = financialFlows.filter(
         (f) => f.source !== nodeId && f.target !== nodeId
       );
@@ -203,17 +337,10 @@ export function useFinancialGraph(
         stillConnected.add(f.source);
         stillConnected.add(f.target);
       }
-
       const disconnected = Array.from(neighborIds).filter(
         (id) => !stillConnected.has(id)
       );
-
-      return {
-        node,
-        inboundFlows: inbound,
-        outboundFlows: outbound,
-        disconnectedNodeIds: disconnected,
-      };
+      return { node, inboundFlows: inbound, outboundFlows: outbound, disconnectedNodeIds: disconnected };
     },
     [nodeMap, financialFlows]
   );
@@ -230,7 +357,6 @@ export function useFinancialGraph(
     [selectedNodeId]
   );
 
-  // ---- CRUD: Bulk add (CSV import) ----
   const bulkAdd = useCallback(
     (newNodes: FinancialNodeData[], newFlows: FinancialFlowData[]) => {
       setFinancialNodes((prev) => [...prev, ...newNodes]);
@@ -239,7 +365,6 @@ export function useFinancialGraph(
     []
   );
 
-  // ---- CRUD: Flows ----
   const addFlow = useCallback((flow: Omit<FinancialFlowData, "id">) => {
     const id = `flow-${Date.now()}`;
     setFinancialFlows((prev) => [...prev, { id, ...flow }]);
@@ -255,8 +380,7 @@ export function useFinancialGraph(
   );
 
   // ---- Derived data ----
-  const selectedNode =
-    selectedNodeId ? nodeMap.get(selectedNodeId) ?? null : null;
+  const selectedNode = selectedNodeId ? nodeMap.get(selectedNodeId) ?? null : null;
   const selectedFlow = selectedEdgeId
     ? financialFlows.find((f) => f.id === selectedEdgeId) ?? null
     : null;
@@ -269,18 +393,12 @@ export function useFinancialGraph(
   }, [selectedNodeId, financialFlows]);
 
   const totalIncome = useMemo(
-    () =>
-      financialNodes
-        .filter((n) => n.type === "income")
-        .reduce((s, n) => s + n.monthlyFlow, 0),
+    () => financialNodes.filter((n) => n.type === "income").reduce((s, n) => s + n.monthlyFlow, 0),
     [financialNodes]
   );
 
   const totalExpenses = useMemo(
-    () =>
-      financialNodes
-        .filter((n) => n.type === "expense" || n.type === "debt")
-        .reduce((s, n) => s + n.monthlyFlow, 0),
+    () => financialNodes.filter((n) => n.type === "expense" || n.type === "debt").reduce((s, n) => s + n.monthlyFlow, 0),
     [financialNodes]
   );
 
@@ -292,10 +410,14 @@ export function useFinancialGraph(
     onNodeClick: handleNodeClick,
     onEdgeClick: handleEdgeClick,
     onPaneClick: handlePaneClick,
+    onNodeDragStart: handleNodeDragStart,
+    onNodeDrag: handleNodeDrag,
+    onNodeDragStop: handleNodeDragStop,
 
     financialNodes,
     financialFlows,
     nodeMap,
+    connectedNodeIds,
 
     selectedNodeId,
     selectedEdgeId,
@@ -304,6 +426,7 @@ export function useFinancialGraph(
     connectedFlows,
     setSelectedNodeId,
     setSelectedEdgeId,
+    deselectNode,
 
     addNode,
     updateNode,

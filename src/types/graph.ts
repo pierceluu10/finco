@@ -40,6 +40,9 @@ export interface NodeRfData {
   color: string;
   showLabel: boolean;
   metadata: Record<string, unknown>;
+  dimmed: boolean;
+  floatDelay: number;
+  floatDuration: number;
 }
 
 export interface EdgeRfData {
@@ -47,6 +50,7 @@ export interface EdgeRfData {
   frequency: string;
   sourceLabel: string;
   targetLabel: string;
+  dimmed: boolean;
 }
 
 // ---------------------------------------------------------------------------

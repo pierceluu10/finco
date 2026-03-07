@@ -10,20 +10,44 @@ import type {
 import { getNodeColor, EDGE_ARROW_COLOR, EDGE_COLOR_DEFAULT } from "@/lib/graph-theme";
 
 // ---------------------------------------------------------------------------
-// Node radius (sqrt-scaled from monthly flow) — smaller for denser graphs
+// Financial weight — the single "amount" used for sizing each node
 // ---------------------------------------------------------------------------
 
-const MIN_RADIUS = 12;
-const MAX_RADIUS = 30;
-const REFERENCE_FLOW = 8500;
+const MIN_RADIUS = 20;
+const MAX_RADIUS = 70;
 
-export function computeNodeRadius(monthlyFlow: number): number {
-  if (monthlyFlow <= 0) return MIN_RADIUS;
-  const t = Math.sqrt(monthlyFlow) / Math.sqrt(REFERENCE_FLOW);
-  return MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * Math.min(t, 1);
+export function getNodeFinancialWeight(node: FinancialNodeData): number {
+  return Math.max(node.currentValue, node.monthlyFlow) || 1;
 }
 
-// Re-export for consumers that used this from graph-transforms before
+export function computeNodeRadius(
+  amount: number,
+  minAmount: number,
+  maxAmount: number
+): number {
+  const sqrtAmt = Math.sqrt(amount);
+  const sqrtMin = Math.sqrt(minAmount);
+  const sqrtMax = Math.sqrt(maxAmount);
+  const range = sqrtMax - sqrtMin;
+  if (range <= 0) return (MIN_RADIUS + MAX_RADIUS) / 2;
+  const t = (sqrtAmt - sqrtMin) / range;
+  return MIN_RADIUS + t * (MAX_RADIUS - MIN_RADIUS);
+}
+
+export function computeAllRadii(
+  nodes: FinancialNodeData[]
+): Map<string, number> {
+  const weights = nodes.map((n) => getNodeFinancialWeight(n));
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const m = new Map<string, number>();
+  for (let i = 0; i < nodes.length; i++) {
+    m.set(nodes[i].id, computeNodeRadius(weights[i], minW, maxW));
+  }
+  return m;
+}
+
+// Re-export for consumers
 export { getNodeColor } from "@/lib/graph-theme";
 
 // ---------------------------------------------------------------------------
@@ -34,9 +58,10 @@ function computeLabeledNodes(nodes: FinancialNodeData[]): Set<string> {
   const largestByType = new Map<FinancialNodeType, { id: string; flow: number }>();
 
   for (const n of nodes) {
+    const w = getNodeFinancialWeight(n);
     const current = largestByType.get(n.type);
-    if (!current || n.monthlyFlow > current.flow) {
-      largestByType.set(n.type, { id: n.id, flow: n.monthlyFlow });
+    if (!current || w > current.flow) {
+      largestByType.set(n.type, { id: n.id, flow: w });
     }
   }
 
@@ -49,13 +74,15 @@ function computeLabeledNodes(nodes: FinancialNodeData[]): Set<string> {
 
 export function toReactFlowNodes(
   nodes: FinancialNodeData[],
-  positions: Map<string, { x: number; y: number }>
+  positions: Map<string, { x: number; y: number }>,
+  radiiMap?: Map<string, number>
 ): Node<NodeRfData>[] {
   const labeled = computeLabeledNodes(nodes);
+  const radii = radiiMap ?? computeAllRadii(nodes);
 
-  return nodes.map((n) => {
+  return nodes.map((n, i) => {
     const pos = positions.get(n.id) ?? { x: 0, y: 0 };
-    const radius = computeNodeRadius(n.monthlyFlow);
+    const radius = radii.get(n.id) ?? 30;
 
     return {
       id: n.id,
@@ -70,6 +97,9 @@ export function toReactFlowNodes(
         color: getNodeColor(n.type),
         showLabel: labeled.has(n.id),
         metadata: n.metadata,
+        dimmed: false,
+        floatDelay: -(((i * 1.7 + 0.3) % 8) * 1000),
+        floatDuration: 4000 + ((i * 1337) % 4000),
       },
     };
   });
@@ -97,6 +127,7 @@ export function toReactFlowEdges(
       frequency: f.frequency,
       sourceLabel: nodeMap.get(f.source)?.label ?? f.source,
       targetLabel: nodeMap.get(f.target)?.label ?? f.target,
+      dimmed: false,
     },
   }));
 }

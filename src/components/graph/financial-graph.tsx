@@ -1,14 +1,17 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
+  useReactFlow,
   type NodeTypes,
   type EdgeTypes,
   type Node,
   type Edge,
   type NodeChange,
   type EdgeChange,
+  type NodeDragHandler,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { NodeRfData, EdgeRfData } from "@/types/graph";
@@ -23,6 +26,10 @@ interface FinancialGraphProps {
   onNodeClick: (event: React.MouseEvent, node: Node<NodeRfData>) => void;
   onEdgeClick: (event: React.MouseEvent, edge: Edge<EdgeRfData>) => void;
   onPaneClick: () => void;
+  onNodeDragStart?: NodeDragHandler;
+  onNodeDrag?: NodeDragHandler;
+  onNodeDragStop?: NodeDragHandler;
+  selectedNodeId: string | null;
 }
 
 const nodeTypes: NodeTypes = { financial: FinancialNode };
@@ -36,7 +43,28 @@ export function FinancialGraph({
   onNodeClick,
   onEdgeClick,
   onPaneClick,
+  onNodeDragStart,
+  onNodeDrag,
+  onNodeDragStop,
+  selectedNodeId,
 }: FinancialGraphProps) {
+  const { setCenter, fitView } = useReactFlow();
+  const prevSelectedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (selectedNodeId && selectedNodeId !== prevSelectedRef.current) {
+      const node = nodes.find((n) => n.id === selectedNodeId);
+      if (node) {
+        const cx = node.position.x + node.data.radius;
+        const cy = node.position.y + node.data.radius;
+        setCenter(cx, cy, { zoom: 1.6, duration: 400 });
+      }
+    } else if (!selectedNodeId && prevSelectedRef.current) {
+      fitView({ padding: 0.35, maxZoom: 1.1, duration: 300 });
+    }
+    prevSelectedRef.current = selectedNodeId;
+  }, [selectedNodeId, nodes, setCenter, fitView]);
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -46,6 +74,9 @@ export function FinancialGraph({
       onNodeClick={onNodeClick}
       onEdgeClick={onEdgeClick}
       onPaneClick={onPaneClick}
+      onNodeDragStart={onNodeDragStart}
+      onNodeDrag={onNodeDrag}
+      onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       fitView

@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateLibrarianExplanation } from "@/lib/gemini";
+import { generateLibrarianResponse } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
   try {
-    const { node } = await req.json();
+    const { graphState, message } = await req.json();
 
-    if (!node) {
-      return NextResponse.json({ error: "Node data required" }, { status: 400 });
+    if (!graphState || !message) {
+      return NextResponse.json(
+        { error: "Both graphState and message are required" },
+        { status: 400 }
+      );
     }
 
-    const explanation = await generateLibrarianExplanation(node);
+    const reply = await generateLibrarianResponse(graphState, message);
 
-    return NextResponse.json({ explanation });
+    return NextResponse.json({ reply });
   } catch (error) {
     console.error("Librarian API error:", error);
     return NextResponse.json(
-      { error: "Failed to generate explanation" },
+      { error: "Failed to generate response" },
       { status: 500 }
     );
   }

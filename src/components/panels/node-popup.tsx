@@ -1,0 +1,308 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useReactFlow } from "reactflow";
+import { X, Send, Loader2 } from "lucide-react";
+import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
+import { getNodeColor } from "@/lib/graph-theme";
+import { formatCurrency } from "@/lib/utils";
+
+interface NodePopupProps {
+  node: FinancialNodeData;
+  connectedFlows: FinancialFlowData[];
+  nodeMap: Map<string, FinancialNodeData>;
+  onClose: () => void;
+}
+
+function serializeNodeContext(
+  node: FinancialNodeData,
+  flows: FinancialFlowData[],
+  nodeMap: Map<string, FinancialNodeData>
+): string {
+  const lines: string[] = [];
+  lines.push(`Node: ${node.label} (${node.type})`);
+  lines.push(`Current Value: ${node.currentValue} CAD`);
+  lines.push(`Monthly Flow: ${node.monthlyFlow} CAD`);
+  const meta = Object.entries(node.metadata)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+  if (meta) lines.push(`Metadata: ${meta}`);
+  lines.push("");
+  lines.push("Connected Flows:");
+  for (const f of flows) {
+    const srcLabel = nodeMap.get(f.source)?.label ?? f.source;
+    const tgtLabel = nodeMap.get(f.target)?.label ?? f.target;
+    lines.push(`  ${srcLabel} -> ${tgtLabel}: ${f.amount} CAD (${f.frequency})`);
+  }
+  return lines.join("\n");
+}
+
+export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupProps) {
+  const { getViewport } = useReactFlow();
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatResponse, setChatResponse] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const color = getNodeColor(node.type);
+  const inbound = connectedFlows.filter((f) => f.target === node.id);
+  const outbound = connectedFlows.filter((f) => f.source === node.id);
+
+  // Compute screen position from node's flow coordinates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const rfNodes = document.querySelectorAll<HTMLElement>(`[data-id="${node.id}"]`);
+      if (rfNodes.length > 0) {
+        const rect = rfNodes[0].getBoundingClientRect();
+        const container = rfNodes[0].closest(".react-flow");
+        if (container) {
+          const cRect = container.getBoundingClientRect();
+          const nodeCenterX = rect.left - cRect.left + rect.width / 2;
+          const nodeCenterY = rect.top - cRect.top + rect.height;
+          setPos({ x: nodeCenterX, y: nodeCenterY + 12 });
+        }
+      }
+      setVisible(true);
+    }, 420);
+    return () => clearTimeout(timer);
+  }, [node.id, getViewport]);
+
+  const clampPosition = useCallback(() => {
+    if (!pos || !popupRef.current) return pos;
+    const popup = popupRef.current;
+    const parent = popup.parentElement;
+    if (!parent) return pos;
+    const pRect = parent.getBoundingClientRect();
+    const popW = 300;
+    const popH = popup.offsetHeight;
+    let x = pos.x - popW / 2;
+    let y = pos.y;
+    if (x < 8) x = 8;
+    if (x + popW > pRect.width - 8) x = pRect.width - popW - 8;
+    if (y + popH > pRect.height - 8) y = pos.y - popH - 40;
+    if (y < 8) y = 8;
+    return { x, y };
+  }, [pos]);
+
+  const clamped = clampPosition();
+
+  const sendChat = useCallback(async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+    setChatLoading(true);
+    setChatResponse(null);
+    try {
+      const context = serializeNodeContext(node, connectedFlows, nodeMap);
+      const graphState = `FOCUSED NODE CONTEXT\n${context}`;
+      const res = await fetch("/api/ai/librarian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ graphState, message: msg }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setChatResponse(data.reply);
+    } catch {
+      setChatResponse("Unable to get a response right now. Please try again.");
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatInput, chatLoading, node, connectedFlows, nodeMap]);
+
+  if (!pos || !clamped) return null;
+
+  return (
+    <div
+      ref={popupRef}
+      className="absolute z-50"
+      style={{
+        left: clamped.x,
+        top: clamped.y,
+        width: 300,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "scale(1)" : "scale(0.95)",
+        transition: "opacity 0.25s ease, transform 0.25s ease",
+        pointerEvents: visible ? "auto" : "none",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        style={{
+          background: "#0a0a14",
+          border: "1px solid rgba(127, 127, 250, 0.25)",
+          borderLeft: `3px solid ${color}`,
+          borderRadius: 14,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+          overflow: "hidden",
+        }}
+      >
+        {/* SECTION 1 — Header */}
+        <div className="px-4 pt-4 pb-3 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1 rounded-md transition"
+            style={{ color: "#6b6b9a" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b9a")}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 18, color: "#e8e8ff" }}>
+              {node.label}
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
+              style={{
+                backgroundColor: `${color}26`,
+                color: color,
+                fontFamily: "var(--font-manrope)",
+              }}
+            >
+              {node.type}
+            </span>
+          </div>
+          <span style={{ fontFamily: "var(--font-jetbrains)", fontWeight: 700, fontSize: 22, color: "#e8e8ff" }}>
+            {formatCurrency(node.currentValue > 0 ? node.currentValue : node.monthlyFlow)}
+            {node.currentValue <= 0 && node.monthlyFlow > 0 && (
+              <span style={{ fontSize: 13, color: "#6b6b9a", fontWeight: 500 }}>/mo</span>
+            )}
+          </span>
+        </div>
+
+        {/* SECTION 2 — Divider */}
+        <div style={{ height: 1, background: "#1a1a2e" }} />
+
+        {/* SECTION 3 — Flows */}
+        <div className="px-4 py-3">
+          <p style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+            Flows
+          </p>
+          {inbound.length === 0 && outbound.length === 0 && (
+            <p style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#6b6b9a" }}>
+              No connected flows
+            </p>
+          )}
+          <div className="space-y-1.5">
+            {inbound.map((f) => (
+              <div key={f.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span style={{ color: "#4ade80", fontSize: 12 }}>↓</span>
+                  <span className="truncate" style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#9a9abe" }}>
+                    {nodeMap.get(f.source)?.label ?? f.source}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: 13, color: "#4ade80" }}>
+                    {formatCurrency(f.amount)}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-manrope)", fontSize: 10, color: "#6b6b9a" }}>
+                    /{f.frequency === "monthly" ? "mo" : f.frequency}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {outbound.map((f) => (
+              <div key={f.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span style={{ color: "#f87171", fontSize: 12 }}>↑</span>
+                  <span className="truncate" style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#9a9abe" }}>
+                    {nodeMap.get(f.target)?.label ?? f.target}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: 13, color: "#f87171" }}>
+                    {formatCurrency(f.amount)}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-manrope)", fontSize: 10, color: "#6b6b9a" }}>
+                    /{f.frequency === "monthly" ? "mo" : f.frequency}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 4 — Divider */}
+        <div style={{ height: 1, background: "#1a1a2e" }} />
+
+        {/* SECTION 5 — Metadata */}
+        {Object.keys(node.metadata).length > 0 && (
+          <>
+            <div className="px-4 py-3 space-y-1.5">
+              {Object.entries(node.metadata).map(([key, val]) => (
+                <div key={key} className="flex justify-between items-baseline gap-2">
+                  <span className="capitalize" style={{ fontFamily: "var(--font-manrope)", fontWeight: 500, fontSize: 12, color: "#6b6b9a" }}>
+                    {key.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-right truncate max-w-[140px]" style={{ fontFamily: "var(--font-jetbrains)", fontSize: 12, color: "#e8e8ff" }}>
+                    {Array.isArray(val) ? val.join(", ") : String(val)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ height: 1, background: "#1a1a2e" }} />
+          </>
+        )}
+
+        {/* SECTION 7 — Agent Chat */}
+        <div className="px-4 py-3">
+          <p style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+            Ask Librarian
+          </p>
+
+          {chatResponse && (
+            <div
+              className="rounded-lg px-3 py-2.5 mb-2"
+              style={{ background: "#07070e", fontFamily: "var(--font-manrope)", fontWeight: 500, fontSize: 13, color: "#c8c8e8", lineHeight: 1.5 }}
+            >
+              {chatResponse}
+            </div>
+          )}
+
+          {chatLoading && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#7F7FFA" }} />
+              <span style={{ fontFamily: "var(--font-manrope)", fontSize: 11, color: "#6b6b9a" }}>Thinking...</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
+              placeholder="Ask something about this node..."
+              style={{
+                flex: 1,
+                background: "#050508",
+                border: "1px solid #1a1a2e",
+                borderRadius: 8,
+                padding: "7px 10px",
+                fontFamily: "var(--font-manrope)",
+                fontSize: 13,
+                color: "#e8e8ff",
+                outline: "none",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(127,127,250,0.5)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#1a1a2e")}
+            />
+            <button
+              onClick={sendChat}
+              disabled={!chatInput.trim() || chatLoading}
+              className="shrink-0 flex items-center justify-center rounded-lg transition disabled:opacity-30"
+              style={{ width: 32, height: 32, color: "#7F7FFA" }}
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

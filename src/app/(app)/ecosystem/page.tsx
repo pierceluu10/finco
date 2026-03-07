@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { Plus, Upload } from "lucide-react";
+import Image from "next/image";
 
 import { demoNodes, demoEdges } from "@/lib/demo-data";
 import { fromDemoData } from "@/lib/graph-transforms";
@@ -11,11 +12,12 @@ import { useFinancialGraph } from "@/hooks/use-financial-graph";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { FinancialGraph } from "@/components/graph/financial-graph";
 import { GraphLegend } from "@/components/graph/graph-legend";
-import { NodeDetailPanel } from "@/components/panels/node-detail-panel";
 import { EdgeDetailPanel } from "@/components/panels/edge-detail-panel";
 import { AddNodeDialog } from "@/components/panels/add-node-dialog";
 import { DeleteConfirmDialog } from "@/components/panels/delete-confirm-dialog";
 import { CsvUploadDialog } from "@/components/panels/csv-upload-dialog";
+import { LibrarianChat } from "@/components/panels/librarian-chat";
+import { NodePopup } from "@/components/panels/node-popup";
 import type { DialogMode, FinancialNodeData, FinancialFlowData } from "@/types/graph";
 
 const seedData = fromDemoData(demoNodes, demoEdges);
@@ -23,13 +25,13 @@ const seedData = fromDemoData(demoNodes, demoEdges);
 function EcosystemDashboard() {
   const graph = useFinancialGraph(seedData.nodes, seedData.flows);
 
-  // Dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<DialogMode>("add");
   const [editTarget, setEditTarget] = useState<FinancialNodeData | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [librarianOpen, setLibrarianOpen] = useState(false);
 
   const deletionImpact = useMemo(
     () => (deleteTarget ? graph.getDeletionImpact(deleteTarget) : null),
@@ -41,13 +43,10 @@ function EcosystemDashboard() {
     [graph.financialNodes]
   );
 
-  // Connections for edit mode
   const editConnections = useMemo(() => {
     if (!editTarget) return [];
     return graph.financialFlows
-      .filter(
-        (f) => f.source === editTarget.id || f.target === editTarget.id
-      )
+      .filter((f) => f.source === editTarget.id || f.target === editTarget.id)
       .map((f) => ({
         targetId: f.source === editTarget.id ? f.target : f.source,
         direction: (f.source === editTarget.id ? "to" : "from") as "to" | "from",
@@ -61,19 +60,6 @@ function EcosystemDashboard() {
     setEditTarget(null);
     setAddDialogOpen(true);
   }, []);
-
-  const openEditDialog = useCallback(() => {
-    if (!graph.selectedNode) return;
-    setDialogMode("edit");
-    setEditTarget(graph.selectedNode);
-    setAddDialogOpen(true);
-  }, [graph.selectedNode]);
-
-  const openDeleteDialog = useCallback(() => {
-    if (!graph.selectedNodeId) return;
-    setDeleteTarget(graph.selectedNodeId);
-    setDeleteDialogOpen(true);
-  }, [graph.selectedNodeId]);
 
   const handleSubmitNode = useCallback(
     (
@@ -105,33 +91,59 @@ function EcosystemDashboard() {
 
   return (
     <div className="flex h-full w-full">
-      {/* Left sidebar */}
       <AppSidebar
         totalIncome={graph.totalIncome}
         totalExpenses={graph.totalExpenses}
         nodeCount={graph.financialNodes.length}
         flowCount={graph.financialFlows.length}
+        onOpenLibrarian={() => setLibrarianOpen(true)}
       />
 
-      {/* Central canvas */}
-      <div className="relative flex-1 h-full">
-        <FinancialGraph
-          nodes={graph.rfNodes}
-          edges={graph.rfEdges}
-          onNodesChange={graph.onNodesChange}
-          onEdgesChange={graph.onEdgesChange}
-          onNodeClick={graph.onNodeClick}
-          onEdgeClick={graph.onEdgeClick}
-          onPaneClick={graph.onPaneClick}
+      <div className="relative flex-1 h-full overflow-hidden">
+        {/* Background image — z-0 */}
+        <Image
+          src="/images/Vector.png"
+          alt=""
+          fill
+          className="object-cover pointer-events-none select-none"
+          style={{ opacity: 0.07, zIndex: 0 }}
+          priority
         />
 
-        {/* Legend overlay — bottom left */}
-        <div className="absolute bottom-4 left-4 z-10">
+        {/* Graph canvas — z-[1] */}
+        <div className="absolute inset-0" style={{ zIndex: 1 }}>
+          <FinancialGraph
+            nodes={graph.rfNodes}
+            edges={graph.rfEdges}
+            onNodesChange={graph.onNodesChange}
+            onEdgesChange={graph.onEdgesChange}
+            onNodeClick={graph.onNodeClick}
+            onEdgeClick={graph.onEdgeClick}
+            onPaneClick={graph.onPaneClick}
+            onNodeDragStart={graph.onNodeDragStart}
+            onNodeDrag={graph.onNodeDrag}
+            onNodeDragStop={graph.onNodeDragStop}
+            selectedNodeId={graph.selectedNodeId}
+          />
+        </div>
+
+        {/* Node popup — z-50 */}
+        {graph.selectedNode && (
+          <NodePopup
+            node={graph.selectedNode}
+            connectedFlows={graph.connectedFlows}
+            nodeMap={graph.nodeMap}
+            onClose={graph.deselectNode}
+          />
+        )}
+
+        {/* Legend overlay */}
+        <div className="absolute bottom-4 left-4" style={{ zIndex: 10 }}>
           <GraphLegend />
         </div>
 
-        {/* Bottom-right action buttons */}
-        <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+        {/* Action buttons */}
+        <div className="absolute bottom-4 right-4 flex flex-col gap-2" style={{ zIndex: 10 }}>
           <button
             onClick={() => setCsvDialogOpen(true)}
             className="flex items-center gap-2 rounded-lg bg-zinc-900 border border-white/10 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800 hover:border-white/15 transition shadow-lg"
@@ -148,7 +160,7 @@ function EcosystemDashboard() {
           </button>
         </div>
 
-        {/* Edge detail — floating */}
+        {/* Edge detail */}
         {graph.selectedFlow && (
           <EdgeDetailPanel
             flow={graph.selectedFlow}
@@ -159,19 +171,6 @@ function EcosystemDashboard() {
         )}
       </div>
 
-      {/* Right detail panel (node selected) */}
-      {graph.selectedNode && (
-        <NodeDetailPanel
-          node={graph.selectedNode}
-          connectedFlows={graph.connectedFlows}
-          nodeMap={graph.nodeMap}
-          onClose={() => graph.setSelectedNodeId(null)}
-          onEdit={openEditDialog}
-          onDelete={openDeleteDialog}
-        />
-      )}
-
-      {/* Add / Edit dialog */}
       <AddNodeDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
@@ -182,7 +181,6 @@ function EcosystemDashboard() {
         onSubmit={handleSubmitNode}
       />
 
-      {/* Delete confirmation */}
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
@@ -191,12 +189,19 @@ function EcosystemDashboard() {
         onConfirm={handleConfirmDelete}
       />
 
-      {/* CSV upload dialog */}
       <CsvUploadDialog
         open={csvDialogOpen}
         onOpenChange={setCsvDialogOpen}
         existingNodeIds={existingNodeIds}
         onImport={handleCsvImport}
+      />
+
+      <LibrarianChat
+        open={librarianOpen}
+        onClose={() => setLibrarianOpen(false)}
+        financialNodes={graph.financialNodes}
+        financialFlows={graph.financialFlows}
+        nodeMap={graph.nodeMap}
       />
     </div>
   );

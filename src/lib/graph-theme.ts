@@ -1,25 +1,25 @@
 import type { FinancialNodeType } from "@/types/graph";
 
 // ---------------------------------------------------------------------------
-// Finco node color palette — all blue family, derived from brand #7F7FFA
+// Finco node color palette — hue variations of brand #7F7FFA (HSL 240 94% 74%)
 //
 // Edit this single file to change the entire graph color system.
 // ---------------------------------------------------------------------------
 
 export const NODE_COLORS: Record<FinancialNodeType, string> = {
-  income: "#5B9CF5",     // bright medium blue — active incoming money
-  account: "#7F8FBA",    // muted blue-gray — neutral hub / holding
-  expense: "#6B7FA0",    // steel blue — outgoing spend
-  debt: "#4E6280",       // dark slate blue — obligations
-  savings: "#7AAFDA",    // sky blue — safe, stored
-  investment: "#5B7FC5", // deeper blue — growth / long-term
+  income:     "#8FA5FF", // lighter blue-lavender — incoming money
+  account:    "#7F7FFA", // base indigo — neutral hub
+  expense:    "#A07FFF", // purple-shifted — outgoing spend
+  debt:       "#6E6EE8", // deeper muted indigo — obligations
+  savings:    "#7F9FFF", // blue-shifted — safe, stored
+  investment: "#B580FF", // violet-shifted — growth / long-term
 };
 
 export function getNodeColor(type: FinancialNodeType): string {
-  return NODE_COLORS[type] ?? "#7F8FBA";
+  return NODE_COLORS[type] ?? "#7F7FFA";
 }
 
-// Edge styling constants
-export const EDGE_COLOR_DEFAULT = "rgba(120, 140, 170, 0.14)";
-export const EDGE_COLOR_ACTIVE = "rgba(120, 140, 170, 0.45)";
-export const EDGE_ARROW_COLOR = "rgba(120, 140, 170, 0.4)";
+// Edge styling constants — tinted toward #7F7FFA family
+export const EDGE_COLOR_DEFAULT = "rgba(127, 127, 250, 0.12)";
+export const EDGE_COLOR_ACTIVE = "rgba(127, 127, 250, 0.4)";
+export const EDGE_ARROW_COLOR = "rgba(127, 127, 250, 0.35)";
