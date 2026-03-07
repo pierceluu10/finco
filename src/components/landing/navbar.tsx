@@ -12,12 +12,12 @@ export function Navbar() {
           <FincoLogo size="lg" />
         </Link>
         <div className="flex w-[80px] justify-end">
-          <Link
-            href="/login"
+          <a
+            href="/auth/login"
             className="inline-flex h-[40px] items-center justify-center rounded-full bg-finco-blue px-6 text-sm font-bold text-black transition-colors hover:bg-finco-blue/90"
           >
             Login
-          </Link>
+          </a>
         </div>
       </div>
     </nav>

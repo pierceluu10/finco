@@ -134,13 +134,13 @@ export function AppSidebar({
           <Settings className="h-3 w-3" />
           Settings
         </Link>
-        <Link
-          href="/"
+        <a
+          href="/auth/logout"
           className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-white/5 hover:text-zinc-300 transition"
         >
           <LogOut className="h-3 w-3" />
           Sign Out
-        </Link>
+        </a>
       </div>
     </aside>
   );
