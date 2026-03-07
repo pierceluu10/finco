@@ -73,13 +73,22 @@ export function HeroSection() {
         </motion.p>
 
         <motion.h1
-          className="mb-10 text-[64px] font-bold leading-[74px] tracking-[-0.01em] text-finco-blue"
+          className="mb-4 text-[64px] font-bold leading-[74px] tracking-[-0.01em] text-finco-blue"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           Your Financial Ecosystem.
         </motion.h1>
+
+        <motion.p
+          className="mb-10 text-[18px] font-normal leading-relaxed tracking-[-0.01em] text-finco-blue/60"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          Visualize where your money comes from and where it goes
+        </motion.p>
 
         <motion.div
           className="flex items-center justify-center gap-7"
