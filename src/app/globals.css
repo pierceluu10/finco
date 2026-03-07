@@ -178,3 +178,17 @@ body {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* Ecosystem intro logo sequence (1200ms total) */
+@keyframes introLogoSeq {
+  0%      { opacity: 0; transform: translateY(0); }
+  33.3%   { opacity: 1; transform: translateY(0); }
+  75%     { opacity: 1; transform: translateY(0); }
+  100%    { opacity: 0; transform: translateY(-60px); }
+}
+
+/* Sidebar slide-in (used as transition, not animation) */
+@keyframes sidebarSlideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+

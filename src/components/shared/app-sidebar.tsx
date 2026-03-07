@@ -56,6 +56,8 @@ interface SidebarProps {
     nodes: ParsedCsvNode[],
     edges: ParsedCsvEdge[]
   ) => number;
+  introStyle?: React.CSSProperties;
+  introContentOpacity?: number;
 }
 
 // Types for the CSV parser API response
@@ -179,28 +181,43 @@ export function AppSidebar({
   onAddNodeDirect,
   onCsvImportDirect,
   onParsedCsvMerge,
+  introStyle,
+  introContentOpacity,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
 
   const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
 
+  const outerStyle: React.CSSProperties = {
+    width: collapsed ? 0 : "33.333vw",
+    transition: `width ${TRANSITION}`,
+    ...introStyle,
+  };
+
+  const hasIntroOverride = introContentOpacity !== undefined;
+  const innerOpacity = hasIntroOverride
+    ? introContentOpacity
+    : collapsed
+      ? 0
+      : 1;
+  const innerTransition = hasIntroOverride
+    ? "opacity 300ms ease"
+    : collapsed
+      ? "opacity 150ms ease"
+      : "opacity 150ms ease 200ms";
+
   return (
     <div
       className="fixed left-0 top-0 z-40 h-screen"
-      style={{
-        width: collapsed ? 0 : "33.333vw",
-        transition: `width ${TRANSITION}`,
-      }}
+      style={outerStyle}
     >
       {/* Inner panel (clips content) */}
       <div
         className="h-full flex flex-col border-r border-white/5 bg-zinc-950"
         style={{
           overflow: "hidden",
-          opacity: collapsed ? 0 : 1,
-          transition: collapsed
-            ? "opacity 150ms ease"
-            : "opacity 150ms ease 200ms",
+          opacity: innerOpacity,
+          transition: innerTransition,
         }}
       >
         {/* Logo */}
