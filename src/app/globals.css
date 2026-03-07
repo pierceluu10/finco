@@ -128,3 +128,53 @@ body {
 .node-float-wrapper.node-dragging {
   animation-play-state: paused;
 }
+
+/* Agent status dot pulse */
+@keyframes agentPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.agent-pulse {
+  animation: agentPulse 2s ease-in-out infinite;
+}
+
+/* Tab content fade-in */
+@keyframes sidebarFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sidebar-fade-in {
+  animation: sidebarFadeIn 150ms ease;
+}
+
+/* Spending bar grow-in */
+@keyframes barGrow {
+  from { width: 0; }
+}
+
+.bar-grow {
+  animation: barGrow 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Savings ring fill */
+@keyframes ringFill {
+  from { stroke-dashoffset: var(--ring-circumference); }
+}
+
+.ring-fill {
+  animation: ringFill 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast slide-in */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+

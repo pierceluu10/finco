@@ -12,7 +12,7 @@ function FinancialNodeComponent({ data, selected, dragging }: NodeProps<NodeRfDa
 
   return (
     <div
-      className={`group relative node-float-wrapper ${dragging ? "node-dragging" : ""}`}
+      className={`group relative font-sans node-float-wrapper ${dragging ? "node-dragging" : ""}`}
       style={{
         width: diameter,
         height: diameter,
