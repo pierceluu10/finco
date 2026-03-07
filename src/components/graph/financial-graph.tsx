@@ -30,6 +30,7 @@ interface FinancialGraphProps {
   onNodeDrag?: NodeDragHandler;
   onNodeDragStop?: NodeDragHandler;
   selectedNodeId: string | null;
+  fitViewTrigger?: number;
 }
 
 const nodeTypes: NodeTypes = { financial: FinancialNode };
@@ -47,9 +48,11 @@ export function FinancialGraph({
   onNodeDrag,
   onNodeDragStop,
   selectedNodeId,
+  fitViewTrigger,
 }: FinancialGraphProps) {
   const { setCenter, fitView } = useReactFlow();
   const prevSelectedRef = useRef<string | null>(null);
+  const prevFitTriggerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (selectedNodeId && selectedNodeId !== prevSelectedRef.current) {
@@ -64,6 +67,16 @@ export function FinancialGraph({
     }
     prevSelectedRef.current = selectedNodeId;
   }, [selectedNodeId, nodes, setCenter, fitView]);
+
+  useEffect(() => {
+    if (
+      fitViewTrigger !== undefined &&
+      fitViewTrigger !== prevFitTriggerRef.current
+    ) {
+      fitView({ padding: 0.35, maxZoom: 1.1, duration: 300 });
+    }
+    prevFitTriggerRef.current = fitViewTrigger;
+  }, [fitViewTrigger, fitView]);
 
   return (
     <ReactFlow

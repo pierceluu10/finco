@@ -51,7 +51,6 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
   const inbound = connectedFlows.filter((f) => f.target === node.id);
   const outbound = connectedFlows.filter((f) => f.source === node.id);
 
-  // Compute screen position from node's flow coordinates
   useEffect(() => {
     const timer = setTimeout(() => {
       const rfNodes = document.querySelectorAll<HTMLElement>(`[data-id="${node.id}"]`);
@@ -117,7 +116,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
   return (
     <div
       ref={popupRef}
-      className="absolute z-50"
+      className="absolute z-50 font-sans"
       style={{
         left: clamped.x,
         top: clamped.y,
@@ -143,46 +142,39 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
         <div className="px-4 pt-4 pb-3 relative">
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 p-1 rounded-md transition"
+            className="absolute top-3 right-3 p-1 rounded-md transition hover:text-[#e8e8ff]"
             style={{ color: "#6b6b9a" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b9a")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
           <div className="flex items-center gap-2 mb-1.5">
-            <span style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 18, color: "#e8e8ff" }}>
+            <span className="font-sans font-bold text-[18px]" style={{ color: "#e8e8ff" }}>
               {node.label}
             </span>
             <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
-              style={{
-                backgroundColor: `${color}26`,
-                color: color,
-                fontFamily: "var(--font-manrope)",
-              }}
+              className="font-sans rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
+              style={{ backgroundColor: `${color}26`, color }}
             >
               {node.type}
             </span>
           </div>
-          <span style={{ fontFamily: "var(--font-jetbrains)", fontWeight: 700, fontSize: 22, color: "#e8e8ff" }}>
+          <span className="font-mono font-bold text-[22px]" style={{ color: "#e8e8ff" }}>
             {formatCurrency(node.currentValue > 0 ? node.currentValue : node.monthlyFlow)}
             {node.currentValue <= 0 && node.monthlyFlow > 0 && (
-              <span style={{ fontSize: 13, color: "#6b6b9a", fontWeight: 500 }}>/mo</span>
+              <span className="font-sans text-[13px] font-medium" style={{ color: "#6b6b9a" }}>/mo</span>
             )}
           </span>
         </div>
 
-        {/* SECTION 2 — Divider */}
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
         {/* SECTION 3 — Flows */}
         <div className="px-4 py-3">
-          <p style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+          <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Flows
           </p>
           {inbound.length === 0 && outbound.length === 0 && (
-            <p style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#6b6b9a" }}>
+            <p className="font-sans text-[12px]" style={{ color: "#6b6b9a" }}>
               No connected flows
             </p>
           )}
@@ -190,16 +182,16 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
             {inbound.map((f) => (
               <div key={f.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span style={{ color: "#4ade80", fontSize: 12 }}>↓</span>
-                  <span className="truncate" style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#9a9abe" }}>
+                  <span className="text-[12px]" style={{ color: "#4ade80" }}>↓</span>
+                  <span className="font-sans truncate text-[12px]" style={{ color: "#9a9abe" }}>
                     {nodeMap.get(f.source)?.label ?? f.source}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: 13, color: "#4ade80" }}>
+                  <span className="font-mono text-[13px]" style={{ color: "#4ade80" }}>
                     {formatCurrency(f.amount)}
                   </span>
-                  <span style={{ fontFamily: "var(--font-manrope)", fontSize: 10, color: "#6b6b9a" }}>
+                  <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
                     /{f.frequency === "monthly" ? "mo" : f.frequency}
                   </span>
                 </div>
@@ -208,16 +200,16 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
             {outbound.map((f) => (
               <div key={f.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span style={{ color: "#f87171", fontSize: 12 }}>↑</span>
-                  <span className="truncate" style={{ fontFamily: "var(--font-manrope)", fontSize: 12, color: "#9a9abe" }}>
+                  <span className="text-[12px]" style={{ color: "#f87171" }}>↑</span>
+                  <span className="font-sans truncate text-[12px]" style={{ color: "#9a9abe" }}>
                     {nodeMap.get(f.target)?.label ?? f.target}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: 13, color: "#f87171" }}>
+                  <span className="font-mono text-[13px]" style={{ color: "#f87171" }}>
                     {formatCurrency(f.amount)}
                   </span>
-                  <span style={{ fontFamily: "var(--font-manrope)", fontSize: 10, color: "#6b6b9a" }}>
+                  <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
                     /{f.frequency === "monthly" ? "mo" : f.frequency}
                   </span>
                 </div>
@@ -226,23 +218,29 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
           </div>
         </div>
 
-        {/* SECTION 4 — Divider */}
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
         {/* SECTION 5 — Metadata */}
         {Object.keys(node.metadata).length > 0 && (
           <>
             <div className="px-4 py-3 space-y-1.5">
-              {Object.entries(node.metadata).map(([key, val]) => (
-                <div key={key} className="flex justify-between items-baseline gap-2">
-                  <span className="capitalize" style={{ fontFamily: "var(--font-manrope)", fontWeight: 500, fontSize: 12, color: "#6b6b9a" }}>
-                    {key.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-right truncate max-w-[140px]" style={{ fontFamily: "var(--font-jetbrains)", fontSize: 12, color: "#e8e8ff" }}>
-                    {Array.isArray(val) ? val.join(", ") : String(val)}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(node.metadata).map(([key, val]) => {
+                const strVal = Array.isArray(val) ? val.join(", ") : String(val);
+                const isNumeric = /^[\d.,]+%?$/.test(strVal);
+                return (
+                  <div key={key} className="flex justify-between items-baseline gap-2">
+                    <span className="font-sans font-medium capitalize text-[12px]" style={{ color: "#6b6b9a" }}>
+                      {key.replace(/_/g, " ")}
+                    </span>
+                    <span
+                      className={`${isNumeric ? "font-mono" : "font-sans"} text-right truncate max-w-[140px] text-[12px]`}
+                      style={{ color: "#e8e8ff" }}
+                    >
+                      {strVal}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
             <div style={{ height: 1, background: "#1a1a2e" }} />
           </>
@@ -250,14 +248,14 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
 
         {/* SECTION 7 — Agent Chat */}
         <div className="px-4 py-3">
-          <p style={{ fontFamily: "var(--font-manrope)", fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+          <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Ask Librarian
           </p>
 
           {chatResponse && (
             <div
-              className="rounded-lg px-3 py-2.5 mb-2"
-              style={{ background: "#07070e", fontFamily: "var(--font-manrope)", fontWeight: 500, fontSize: 13, color: "#c8c8e8", lineHeight: 1.5 }}
+              className="font-sans rounded-lg px-3 py-2.5 mb-2 text-[13px] font-medium leading-relaxed"
+              style={{ background: "#07070e", color: "#c8c8e8" }}
             >
               {chatResponse}
             </div>
@@ -266,7 +264,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
           {chatLoading && (
             <div className="flex items-center gap-2 mb-2 px-1">
               <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#7F7FFA" }} />
-              <span style={{ fontFamily: "var(--font-manrope)", fontSize: 11, color: "#6b6b9a" }}>Thinking...</span>
+              <span className="font-sans text-[11px]" style={{ color: "#6b6b9a" }}>Thinking...</span>
             </div>
           )}
 
@@ -278,16 +276,13 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
               placeholder="Ask something about this node..."
+              className="font-sans flex-1 text-[13px] outline-none"
               style={{
-                flex: 1,
                 background: "#050508",
                 border: "1px solid #1a1a2e",
                 borderRadius: 8,
                 padding: "7px 10px",
-                fontFamily: "var(--font-manrope)",
-                fontSize: 13,
                 color: "#e8e8ff",
-                outline: "none",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(127,127,250,0.5)")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#1a1a2e")}
