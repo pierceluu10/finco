@@ -35,11 +35,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-color: hsl(240 10% 3.9%);
   }
 }
 
 html {
   scroll-behavior: smooth;
+  background-color: hsl(240 10% 3.9%);
 }
 
 body {

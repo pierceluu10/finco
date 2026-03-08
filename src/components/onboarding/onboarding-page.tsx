@@ -114,7 +114,7 @@ export function OnboardingPage({
   const addedCount = onboardingNodes.length;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-black">
+    <div className="flex h-screen flex-col overflow-hidden bg-black" style={{ background: "hsl(240 10% 3.9%)" }}>
       {/* Header */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-6">
         <Link href="/">

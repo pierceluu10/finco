@@ -16,7 +16,6 @@ const DURATION_MS = 4000;
 const PHASE1_END = 1200;
 const PHASE2_END = 1600;
 const PHASE3_END = 3200;
-const RIPPLE_STAGGER_MS = 200;
 
 const HEALTH_WORSE = "#ff4d6d";
 const HEALTH_BETTER = "#00ff88";

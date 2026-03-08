@@ -12,6 +12,7 @@ export default function LandingPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      style={{ background: "hsl(240 10% 3.9%)" }}
     >
       <Navbar />
       <HeroSection />

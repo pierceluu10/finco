@@ -5,7 +5,11 @@ export async function middleware(request: NextRequest) {
   if (!isAuthConfigured()) {
     return NextResponse.next();
   }
-  return await auth0.middleware(request);
+  try {
+    return await auth0.middleware(request);
+  } catch {
+    return NextResponse.next();
+  }
 }
 
 export const config = {
