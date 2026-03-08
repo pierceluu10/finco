@@ -117,7 +117,7 @@ export function HeroSection() {
             className="rounded-full"
           >
             <a
-              href="/auth/login?screen_hint=signup&returnTo=/ecosystem"
+              href="/auth/login?screen_hint=signup&returnTo=/onboarding"
               className="inline-flex h-[49px] items-center justify-center gap-2 rounded-full bg-finco-blue px-[34px] font-sans text-[16px] font-bold text-black transition-colors hover:bg-finco-blue/90"
             >
               Get Started

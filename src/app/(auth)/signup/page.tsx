@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function SignupPage() {
-  redirect("/auth/login?screen_hint=signup&returnTo=/ecosystem");
+  redirect("/auth/login?screen_hint=signup&returnTo=/onboarding");
 }

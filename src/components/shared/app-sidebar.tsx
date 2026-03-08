@@ -836,10 +836,10 @@ function AgentCard({
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// FINANCIALS TAB
+// FINANCIALS TAB (exported for onboarding page)
 // ────────────────────────────────────────────────────────────────────────────
 
-function FinancialsContent({
+export function FinancialsContent({
   financialNodes,
   onAddNodeDirect,
   onCsvImportDirect,

@@ -29,6 +29,7 @@ import type {
 type AgentType = "librarian" | "simulator" | "sentinel";
 
 const STORAGE_KEY = "finco-sidebar-collapsed";
+const ONBOARDING_STORAGE_KEY = "finco-onboarding-data";
 const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
 const SIDEBAR_SLIDE = "500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
 
@@ -36,6 +37,24 @@ const seedData = fromDemoData(demoNodes, demoEdges);
 
 function EcosystemDashboard() {
   const graph = useFinancialGraph(seedData.nodes, seedData.flows);
+
+  // ── Merge onboarding data from sessionStorage (after signup → onboarding → continue) ──
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        nodes?: FinancialNodeData[];
+        flows?: FinancialFlowData[];
+      };
+      sessionStorage.removeItem(ONBOARDING_STORAGE_KEY);
+      const nodes = data.nodes ?? [];
+      const flows = data.flows ?? [];
+      if (nodes.length > 0 || flows.length > 0) graph.bulkAdd(nodes, flows);
+    } catch {
+      /* noop */
+    }
+  }, [graph]);
 
   // ── Sidebar collapse (persisted) ──
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
