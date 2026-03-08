@@ -18,6 +18,7 @@ interface NodePopupProps {
   onUpdateValue?: (nodeId: string, value: number, field: "currentValue" | "monthlyFlow") => void;
   onStemNode?: () => void;
   onLinkNode?: () => void;
+  onDeleteNode?: () => void;
 }
 
 function serializeNodeContext(
@@ -55,6 +56,7 @@ export function NodePopup({
   onUpdateValue,
   onStemNode,
   onLinkNode,
+  onDeleteNode,
 }: NodePopupProps) {
   const [visible, setVisible] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -132,10 +134,10 @@ export function NodePopup({
     try {
       const context = serializeNodeContext(node, connectedFlows, nodeMap);
       const graphState = `FOCUSED NODE CONTEXT\n${context}`;
-      const res = await fetch("/api/ai/sentinel", {
+      const res = await fetch("/api/ai/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ graphState, message: msg }),
+        body: JSON.stringify({ agent: "sentinel", graphState, message: msg }),
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
@@ -282,7 +284,7 @@ export function NodePopup({
           </div>
         </div>
 
-        {/* Stem Node + Link to Node */}
+        {/* Stem / Link / Delete actions */}
         <div className="px-4 py-2 space-y-2">
           {onStemNode && (
             <button
@@ -322,6 +324,29 @@ export function NodePopup({
               }}
             >
               Link to Node
+            </button>
+          )}
+          {onDeleteNode && (
+            <button
+              type="button"
+              onClick={() => {
+                onDeleteNode();
+                onClose();
+              }}
+              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(248,113,113,0.3)",
+                color: "#f87171",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(248,113,113,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              Delete Node
             </button>
           )}
         </div>

@@ -79,6 +79,7 @@ export interface ThreeGraphProps {
   onLinkTargetSelected?: (targetNodeId: string) => void;
   onCancelLinkMode?: () => void;
   flashNodeId?: string | null;
+  onRequestDeleteNode?: (nodeId: string) => void;
 }
 
 /** Node data + layout position for simulation overlay snapshot */
@@ -160,6 +161,7 @@ export function ThreeGraph({
   onLinkTargetSelected,
   onCancelLinkMode,
   flashNodeId = null,
+  onRequestDeleteNode,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -958,6 +960,11 @@ export function ThreeGraph({
               : undefined
           }
           onLinkNode={onRequestLinkMode}
+          onDeleteNode={
+            onRequestDeleteNode && selectedId
+              ? () => onRequestDeleteNode(selectedId)
+              : undefined
+          }
         />
       )}
     </div>

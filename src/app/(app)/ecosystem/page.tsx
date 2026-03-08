@@ -524,6 +524,10 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
             onLinkTargetSelected={handleLinkTargetSelected}
             onCancelLinkMode={handleCancelLinkMode}
             flashNodeId={flashNodeId}
+            onRequestDeleteNode={(nodeId) => {
+              setDeleteTarget(nodeId);
+              setDeleteDialogOpen(true);
+            }}
           />
 
           <div
