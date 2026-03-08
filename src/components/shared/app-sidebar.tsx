@@ -4,7 +4,11 @@ import { useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import { User, LogOut, ArrowUp } from "lucide-react";
+=======
+import { User, LogOut, Upload as UploadIcon, ArrowUp, PanelLeftClose, PanelRightOpen } from "lucide-react";
+>>>>>>> Stashed changes
 =======
 import { User, LogOut, Upload as UploadIcon, ArrowUp, PanelLeftClose, PanelRightOpen } from "lucide-react";
 >>>>>>> Stashed changes
