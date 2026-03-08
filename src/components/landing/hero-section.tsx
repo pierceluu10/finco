@@ -64,7 +64,7 @@ export function HeroSection() {
 
       <div className="relative z-10 mx-auto max-w-[921px] px-6 text-center">
         <motion.p
-          className="mb-2 text-[22px] font-bold tracking-[-0.018em] text-finco-blue"
+          className="mb-2 font-sans text-[22px] font-bold tracking-[-0.018em] text-finco-blue"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
@@ -73,7 +73,7 @@ export function HeroSection() {
         </motion.p>
 
         <motion.h1
-          className="mb-4 text-[64px] font-bold leading-[74px] tracking-[-0.01em] text-finco-blue"
+          className="mb-4 font-sans text-[64px] font-bold leading-[74px] tracking-[-0.01em] text-finco-blue"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
@@ -82,7 +82,7 @@ export function HeroSection() {
         </motion.h1>
 
         <motion.p
-          className="mb-10 text-[18px] font-normal leading-relaxed tracking-[-0.01em] text-finco-blue/60"
+          className="mb-10 font-sans text-[18px] font-normal leading-relaxed tracking-[-0.01em] text-finco-blue/60"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
@@ -104,7 +104,7 @@ export function HeroSection() {
           >
             <Link
               href="/ecosystem"
-              className="inline-flex h-[49px] w-[196px] items-center justify-center rounded-full border-[1.4px] border-finco-blue font-display text-[16px] font-medium text-finco-blue transition-colors hover:bg-finco-blue/10"
+              className="inline-flex h-[49px] w-[196px] items-center justify-center rounded-full border-[1.4px] border-finco-blue font-sans text-[16px] font-bold text-finco-blue transition-colors hover:bg-finco-blue/10"
             >
               Visit Ecosystem
             </Link>
@@ -118,7 +118,7 @@ export function HeroSection() {
           >
             <a
               href="/auth/login?screen_hint=signup&returnTo=/ecosystem"
-              className="inline-flex h-[49px] items-center justify-center gap-2 rounded-full bg-finco-blue px-[34px] font-display text-[16px] font-medium text-black transition-colors hover:bg-finco-blue/90"
+              className="inline-flex h-[49px] items-center justify-center gap-2 rounded-full bg-finco-blue px-[34px] font-sans text-[16px] font-bold text-black transition-colors hover:bg-finco-blue/90"
             >
               Get Started
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -30,7 +30,7 @@ export function FincoLogo({
       </svg>
       <span
         className={cn(
-          "font-bold tracking-[-0.018em] text-finco-blue",
+          "font-sans font-bold tracking-[-0.018em] text-finco-blue",
           s.text
         )}
       >

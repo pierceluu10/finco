@@ -11,8 +11,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-manrope)", "system-ui", "sans-serif"],
-        display: ["var(--font-poppins)", "system-ui", "sans-serif"],
-        mono: ["var(--font-jetbrains)", "monospace"],
+        display: ["var(--font-manrope)", "system-ui", "sans-serif"],
+        mono: ["var(--font-manrope)", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

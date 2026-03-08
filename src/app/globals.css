@@ -47,6 +47,11 @@ body {
   font-family: 'Manrope', var(--font-manrope), sans-serif;
 }
 
+/* All text uses Manrope; numbers keep tabular-nums where applied */
+p, h1, h2, h3, h4, h5, h6, span, a, button, label, input, select, textarea {
+  font-family: inherit;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
