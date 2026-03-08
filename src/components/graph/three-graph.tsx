@@ -595,6 +595,7 @@ export function ThreeGraph({
   }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   // Wheel zoom handler
   useEffect(() => {
     const el = containerRef.current;
@@ -666,6 +667,52 @@ export function ThreeGraph({
 
   // Keep zoom params ref in sync for drag coordinate conversion (always set so screenToSim works)
   useEffect(() => {
+=======
+  // Compute zoom transform: fit actual node bounding box when no selection; zoom-to-node when selected
+  const fitParams = useMemo(() => {
+    if (nodes.length === 0) {
+      const cx = size.w / 2;
+      const cy = size.h / 2;
+      const scale = Math.min(size.w / (2 * LAYOUT_RADIUS_X), size.h / (2 * LAYOUT_RADIUS_Y), 1) * 0.9;
+      return { scale, tx: cx * (1 - scale), ty: cy * (1 - scale) };
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      const r = n.radius ?? 28;
+      minX = Math.min(minX, n.x - r);
+      maxX = Math.max(maxX, n.x + r);
+      minY = Math.min(minY, n.y - r);
+      maxY = Math.max(maxY, n.y + r);
+    }
+    // Pad must cover curved edge bulge (curveOffset up to 20) so links aren't clipped at container edge
+    const pad = 120;
+    const boxW = Math.max(maxX - minX + pad * 2, 1);
+    const boxH = Math.max(maxY - minY + pad * 2, 1);
+    const scale = Math.min(size.w / boxW, size.h / boxH) * 0.92;
+    const boxCx = (minX + maxX) / 2;
+    const boxCy = (minY + maxY) / 2;
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    const tx = cx - boxCx * scale;
+    const ty = cy - boxCy * scale;
+    return { scale, tx, ty };
+  }, [nodes, size.w, size.h]);
+
+  const zoomTransform = useMemo(() => {
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    if (zoomTarget && selectedId) {
+      const scale = 1.5;
+      const tx = cx - zoomTarget.x * scale;
+      const ty = cy - zoomTarget.y * scale;
+      return `translate(${tx}px, ${ty}px) scale(${scale})`;
+    }
+    return `translate(${fitParams.tx}px, ${fitParams.ty}px) scale(${fitParams.scale})`;
+  }, [zoomTarget, selectedId, size.w, size.h, fitParams]);
+
+  // Keep zoom params ref in sync for drag coordinate conversion (always set so screenToSim works)
+  useEffect(() => {
+>>>>>>> Stashed changes
     const cx = size.w / 2;
     const cy = size.h / 2;
     if (zoomTarget && selectedId) {
@@ -683,6 +730,9 @@ export function ThreeGraph({
       };
     }
   }, [zoomTarget, selectedId, size.w, size.h, fitParams]);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
   // Selected node data for popup
@@ -708,6 +758,7 @@ export function ThreeGraph({
       className="relative w-full h-full"
       onClick={handleCanvasClick}
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       onMouseDown={(e) => {
         const t = e.target as HTMLElement;
         if (t.closest("button") || t.closest("[data-node-id]")) return;
@@ -722,6 +773,9 @@ export function ThreeGraph({
         };
       }}
       style={{ cursor: isDragging ? "grabbing" : "grab" }}
+=======
+      style={{ cursor: draggingRef.current ? "grabbing" : "default", overflow: "visible" }}
+>>>>>>> Stashed changes
 =======
       style={{ cursor: draggingRef.current ? "grabbing" : "default", overflow: "visible" }}
 >>>>>>> Stashed changes
@@ -760,9 +814,12 @@ export function ThreeGraph({
             width: "100%",
             height: "100%",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             transform: `translate(${camera.tx}px, ${camera.ty}px) scale(${camera.scale})`,
             transition: smoothCamera ? "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)" : "none",
 =======
+=======
+>>>>>>> Stashed changes
             overflow: "visible",
             transform: zoomTransform,
             transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
