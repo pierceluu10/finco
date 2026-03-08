@@ -361,7 +361,7 @@ export function AppSidebar({
             cursor: "pointer",
             zIndex: 50,
             pointerEvents: "auto",
-            fontFamily: "var(--font-sans), sans-serif",
+            fontFamily: "'Manrope', sans-serif",
             fontWeight: 500,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}

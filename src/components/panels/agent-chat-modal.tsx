@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send, Loader2, ArrowRight } from "lucide-react";
 import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
 
 type AgentType = "sentinel" | "simulator" | "planner";
@@ -21,8 +21,13 @@ interface AgentChatModalProps {
   financialFlows: FinancialFlowData[];
   nodeMap: Map<string, FinancialNodeData>;
   selectedNodeId?: string;
-  /** Called when Simulator agent finishes a response (streaming or JSON). Use to open simulation overlay. */
-  onSimulatorResponseComplete?: (responseText: string) => void;
+  /** Called when Simulator agent finishes a response (streaming or JSON). Use to open simulation overlay. Second arg is the user's what-if message for API impact. */
+  onSimulatorResponseComplete?: (responseText: string, lastUserMessage?: string) => void;
+  /** When an agent suggests handing off to another (e.g. Sentinel → Simulator). Parent should switch agent and pass reboundMessage. */
+  onHandoff?: (to: AgentType, lastUserMessage: string) => void;
+  /** Pre-fill input and clear history when switching to this agent (e.g. after handoff). Clear after applying. */
+  reboundMessage?: string | null;
+  onClearRebound?: () => void;
 }
 
 const AGENT_META: Record<
@@ -96,12 +101,16 @@ export function AgentChatModal({
   nodeMap,
   selectedNodeId,
   onSimulatorResponseComplete,
+  onHandoff,
+  reboundMessage,
+  onClearRebound,
 }: AgentChatModalProps) {
   const meta = AGENT_META[agent] ?? AGENT_META.sentinel;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [pendingHandoff, setPendingHandoff] = useState<{ to: AgentType; lastUserMessage: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -118,7 +127,17 @@ export function AgentChatModal({
     setInput("");
     setLoading(false);
     setStreamingText("");
+    setPendingHandoff(null);
   }, [agent]);
+
+  // Rebound: when parent switched agent and passed a message to continue with, pre-fill input
+  useEffect(() => {
+    if (reboundMessage && open) {
+      setInput(reboundMessage);
+      setMessages([]);
+      onClearRebound?.();
+    }
+  }, [reboundMessage, open, onClearRebound]);
 
   const sendMessage = useCallback(async () => {
     const trimmed = input.trim();
@@ -178,7 +197,7 @@ export function AgentChatModal({
         ]);
         setStreamingText("");
         if (agent === "simulator" && accumulated.trim()) {
-          onSimulatorResponseComplete?.(accumulated);
+          onSimulatorResponseComplete?.(accumulated, trimmed);
         }
       } else {
         const data = await res.json();
@@ -186,8 +205,11 @@ export function AgentChatModal({
           ...prev,
           { role: "assistant", content: data.reply, timestamp: new Date() },
         ]);
+        if (data.handoff?.to && onHandoff) {
+          setPendingHandoff({ to: data.handoff.to, lastUserMessage: trimmed });
+        }
         if (agent === "simulator" && data.reply?.trim()) {
-          onSimulatorResponseComplete?.(data.reply);
+          onSimulatorResponseComplete?.(data.reply, trimmed);
         }
       }
     } catch {
@@ -203,7 +225,7 @@ export function AgentChatModal({
       setLoading(false);
       setStreamingText("");
     }
-  }, [input, loading, financialNodes, financialFlows, nodeMap, agent, selectedNodeId, onSimulatorResponseComplete]);
+  }, [input, loading, financialNodes, financialFlows, nodeMap, agent, selectedNodeId, onSimulatorResponseComplete, onHandoff]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -401,6 +423,30 @@ export function AgentChatModal({
                   {meta.thinkingText}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Handoff CTA: rebound to another agent */}
+          {pendingHandoff && !loading && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onHandoff?.(pendingHandoff.to, pendingHandoff.lastUserMessage);
+                  setPendingHandoff(null);
+                }}
+                className="font-sans inline-flex items-center gap-2 rounded-lg px-4 py-2.5 transition"
+                style={{
+                  background: `${AGENT_META[pendingHandoff.to].color}20`,
+                  border: `1px solid ${AGENT_META[pendingHandoff.to].color}40`,
+                  color: AGENT_META[pendingHandoff.to].color,
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Continue with {AGENT_META[pendingHandoff.to].label}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
 

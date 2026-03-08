@@ -67,6 +67,7 @@ export function NodePopup({
   const editInputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollBodyRef = useRef<HTMLDivElement>(null);
 
   const color = getNodeColor(node.type);
   const inbound = connectedFlows.filter((f) => f.target === node.id);
@@ -117,10 +118,19 @@ export function NodePopup({
     return () => clearTimeout(timer);
   }, []);
 
-  // Focus Sentinel chat input when overlay is visible so users can type immediately
+  // Start overlay at the top: reset scroll when popup opens so user can scroll down
+  useEffect(() => {
+    if (!visible) return;
+    scrollBodyRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [visible]);
+
+  // Focus Sentinel chat input when overlay is visible so users can type immediately (after scroll reset)
   useEffect(() => {
     if (!visible || editingValue) return;
-    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    const t = setTimeout(() => {
+      scrollBodyRef.current?.scrollTo({ top: 0, left: 0 });
+      inputRef.current?.focus();
+    }, 150);
     return () => clearTimeout(t);
   }, [visible, editingValue]);
 
@@ -133,8 +143,8 @@ export function NodePopup({
   if (x + popW > containerWidth - padding) x = anchorX - popW - 20;
   // Clamp so overlay never goes off-screen
   x = Math.max(padding, Math.min(containerWidth - popW - padding, x));
-  let y = anchorY - maxPopH / 2;
-  y = Math.max(padding, Math.min(containerHeight - maxPopH - padding, y));
+  // Align overlay to top so it starts at the top and user can scroll down
+  const y = padding;
 
   const sendChat = useCallback(async () => {
     const msg = chatInput.trim();
@@ -248,8 +258,8 @@ export function NodePopup({
 
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
-        {/* Scrollable body so overlay stays in view when container is short */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Scrollable body so overlay starts at top and user can scroll down */}
+        <div ref={scrollBodyRef} className="flex-1 min-h-0 overflow-y-auto">
         {/* Flows */}
         <div className="px-4 py-3">
           <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>

@@ -71,6 +71,61 @@ const SENTINEL_JSON_SYSTEM =
 
 const SENTINEL_JSON_TIMEOUT_MS = 3000;
 
+export interface SimulatorImpactChange {
+  nodeId: string;
+  currentValue?: number;
+  monthlyFlow?: number;
+}
+
+export interface SimulatorImpactResult {
+  changes: SimulatorImpactChange[];
+  primaryChangeNodeId?: string;
+}
+
+const SIMULATOR_IMPACT_JSON_SYSTEM = `You are a financial simulation engine. You respond ONLY with valid JSON. No markdown, no explanation.
+
+Given a graph state and a user's "what if" message, determine which nodes are affected and their NEW values after the scenario.
+
+Rules:
+- Use the exact node "id" values from the graph (e.g. "node-123").
+- For each affected node, return the NEW absolute value: currentValue for balance-type nodes (savings, account, debt), monthlyFlow for flow-type (income, expense). So if "chequing loses $500" and chequing had currentValue 2500, return currentValue: 2000 (the new balance), NOT 500.
+- If the user changes one node (e.g. "reduce salary by $500"), compute which other nodes change as a result (e.g. chequing balance drops) and include them with their new values.
+- Return a JSON object with: "changes" (array of { "nodeId": string, "currentValue"?: number, "monthlyFlow"?: number }) and optionally "primaryChangeNodeId" (the node the user directly asked to change).
+- Only include nodes that actually change. Numbers must be the new absolute values, not deltas.`;
+
+export async function generateSimulatorImpactJson(
+  graphState: string,
+  userMessage: string
+): Promise<SimulatorImpactResult | null> {
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  try {
+    const result = await Promise.race([
+      model.generateContent([
+        { text: SIMULATOR_IMPACT_JSON_SYSTEM },
+        { text: `GRAPH STATE:\n${graphState}\n\nUSER WHAT-IF MESSAGE:\n${userMessage}` },
+      ]),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 8000)
+      ),
+    ]);
+    const text = result.response.text();
+    const cleaned = text.replace(/```json\s*|\s*```/g, "").trim();
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const changes = Array.isArray(parsed.changes) ? parsed.changes : [];
+    const primary = typeof parsed.primaryChangeNodeId === "string" ? parsed.primaryChangeNodeId : undefined;
+    const normalized: SimulatorImpactChange[] = changes.map((c: Record<string, unknown>) => ({
+      nodeId: String(c.nodeId ?? ""),
+      currentValue: typeof c.currentValue === "number" ? c.currentValue : undefined,
+      monthlyFlow: typeof c.monthlyFlow === "number" ? c.monthlyFlow : undefined,
+    })).filter((c) => c.nodeId.length > 0);
+    return { changes: normalized, primaryChangeNodeId: primary ?? undefined };
+  } catch {
+    return null;
+  }
+}
+
 export async function generateSentinelJson(userMessage: string): Promise<Record<string, unknown> | null> {
   const ai = getGenAI();
   const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });

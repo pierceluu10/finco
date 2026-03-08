@@ -208,3 +208,29 @@ p, h1, h2, h3, h4, h5, h6, span, a, button, label, input, select, textarea {
   50% { box-shadow: 0 0 0 3px #00ff88, 0 0 28px rgba(0,255,136,0.7); }
 }
 
+/* Simulation overlay: node float (gentle physics) */
+@keyframes simNodeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.sim-node-float {
+  animation: simNodeFloat 3.2s ease-in-out infinite;
+  display: block;
+  position: relative;
+}
+
+/* Simulation overlay: edge dash flow */
+@keyframes simEdgeFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 14; }
+}
+
+.sim-edge {
+  animation: simEdgeFlow 2.5s linear infinite;
+}
+
+.sim-edge-bright {
+  animation: none;
+}
+

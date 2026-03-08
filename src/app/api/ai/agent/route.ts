@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
     const planIntent = /\b(plan|planning|planner|i want to plan|help me plan)\b/i.test(message);
     const effectiveAgent = agentName === "sentinel" && planIntent ? "planner" : agentName;
 
+    // Detect what-if / simulator intent for handoff (Sentinel stays as responder but we add handoff hint)
+    const simulatorIntent = agentName === "sentinel" && /\b(what if|what would happen|simulate|scenario|how would|would it affect)\b/i.test(message);
+
     // For planner, redirect to dedicated route
     if (effectiveAgent === "planner") {
       const plannerRes = await fetch(new URL("/api/ai/planner", req.url), {
@@ -122,7 +125,10 @@ export async function POST(req: NextRequest) {
           rounds++;
         }
 
-        return NextResponse.json({ reply: response.content ?? "No response generated." });
+        return NextResponse.json({
+          reply: response.content ?? "No response generated.",
+          ...(simulatorIntent ? { handoff: { to: "simulator" as const } } : {}),
+        });
       } catch (err) {
         console.error(`Backboard ${agent} error, falling back to Gemini:`, err);
       }
@@ -132,7 +138,10 @@ export async function POST(req: NextRequest) {
     const handler = geminiHandlers[effectiveAgent] ?? geminiHandlers["sentinel"];
     if (handler) {
       const reply = await handler(graphState || "", message);
-      return NextResponse.json({ reply });
+      return NextResponse.json({
+        reply,
+        ...(simulatorIntent ? { handoff: { to: "simulator" as const } } : {}),
+      });
     }
 
     return NextResponse.json({ error: `Unable to process ${agent} request` }, { status: 400 });

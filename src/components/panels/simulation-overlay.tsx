@@ -17,23 +17,26 @@ const PHASE1_END = 1200;
 const PHASE2_END = 1600;
 const PHASE3_END = 3200;
 
-const HEALTH_WORSE = "#ff4d6d";
-const HEALTH_BETTER = "#00ff88";
-
 export interface SimulationOverlayProps {
   open: boolean;
   onClose: () => void;
   responseText: string;
   nodes: GraphSnapshotNode[];
   flows: FinancialFlowData[];
+  /** When present, use API-derived changes (new values per node) instead of parsing responseText */
+  simulationChanges?: { nodeId: string; currentValue?: number; monthlyFlow?: number }[];
+  /** Node id the user directly changed (for red/green highlight); when absent, first change is used */
+  primaryChangeNodeId?: string | null;
   onApply?: (updates: Map<string, { currentValue?: number; monthlyFlow?: number }>) => void;
 }
 
 function parseResponseForChange(
   responseText: string,
   nodes: GraphSnapshotNode[]
-): { changedNodeId: string | null; newValue: number | null } {
+): { changedNodeId: string | null; newValue: number | null; isDelta: boolean } {
   const text = responseText.trim().toLowerCase();
+  const isDelta =
+    /\b(lose|loses|loss|drop|drops|decrease|decreases|minus|reduction|reduces?|less|deduct|subtract)\b/i.test(responseText);
   let changedNodeId: string | null = null;
   for (const node of nodes) {
     const label = node.label.toLowerCase();
@@ -42,12 +45,16 @@ function parseResponseForChange(
       break;
     }
   }
-  if (!changedNodeId) return { changedNodeId: null, newValue: null };
+  if (!changedNodeId) return { changedNodeId: null, newValue: null, isDelta: false };
   const moneyMatch = responseText.match(/\$[\d,]+(?:\.\d+)?/);
   const numMatch = responseText.match(/\b(\d{1,10}(?:,\d{3})*(?:\.\d+)?)\s*(?:cad|dollars?|%|\/mo)?/i);
   const raw = moneyMatch?.[0]?.replace(/[$,]/g, "") ?? numMatch?.[1]?.replace(/,/g, "");
   const newValue = raw ? parseFloat(raw) : null;
-  return { changedNodeId, newValue: Number.isFinite(newValue) ? newValue : null };
+  return {
+    changedNodeId,
+    newValue: Number.isFinite(newValue) ? newValue : null,
+    isDelta: isDelta && Number.isFinite(newValue ?? NaN),
+  };
 }
 
 function getAffectedNodeIds(
@@ -86,6 +93,8 @@ export function SimulationOverlay({
   responseText,
   nodes,
   flows,
+  simulationChanges,
+  primaryChangeNodeId: primaryChangeNodeIdProp,
   onApply,
 }: SimulationOverlayProps) {
   const [visible, setVisible] = useState(false);
@@ -99,46 +108,77 @@ export function SimulationOverlay({
   const rafRef = useRef<number>(0);
   const startRef = useRef<number>(0);
 
-  const { changedNodeId, newValue } = useMemo(
+  const { changedNodeId: parsedChangedId, newValue: parsedNewValue, isDelta: parsedIsDelta } = useMemo(
     () => parseResponseForChange(responseText, nodes),
     [responseText, nodes]
   );
 
+  const changedNodeId = primaryChangeNodeIdProp ?? (simulationChanges?.length ? simulationChanges[0]?.nodeId : null) ?? parsedChangedId;
+
   const afterNodes = useMemo(() => {
     const list = nodes.map((n) => ({ ...n, metadata: { ...n.metadata } }));
+    if (simulationChanges?.length) {
+      for (const c of simulationChanges) {
+        const idx = list.findIndex((n) => n.id === c.nodeId);
+        if (idx === -1) continue;
+        const node = list[idx];
+        const currentValue = c.currentValue ?? node.currentValue;
+        const monthlyFlow = c.monthlyFlow ?? node.monthlyFlow;
+        const radius = getRadiusFromValue(node.currentValue !== 0 ? currentValue : monthlyFlow);
+        list[idx] = {
+          ...node,
+          currentValue,
+          monthlyFlow,
+          radius,
+        };
+      }
+      return list;
+    }
     if (!changedNodeId || nodes.length === 0) return list;
     const idx = list.findIndex((n) => n.id === changedNodeId);
     if (idx === -1) return list;
-    const oldVal = list[idx].currentValue !== 0 ? list[idx].currentValue : list[idx].monthlyFlow;
-    const val = newValue ?? oldVal * 1.1;
+    const node = list[idx];
+    const useCurrentValue = node.currentValue !== 0;
+    const oldVal = useCurrentValue ? node.currentValue : node.monthlyFlow;
+    let val: number;
+    if (parsedIsDelta && parsedNewValue != null) {
+      val = Math.max(0, oldVal - parsedNewValue);
+    } else {
+      val = parsedNewValue ?? oldVal * 1.1;
+    }
     list[idx] = {
-      ...list[idx],
-      currentValue: list[idx].type === "income" || list[idx].type === "account" ? val : list[idx].currentValue,
-      monthlyFlow: list[idx].type !== "income" && list[idx].type !== "account" ? val : list[idx].monthlyFlow,
+      ...node,
+      currentValue: useCurrentValue ? val : node.currentValue,
+      monthlyFlow: useCurrentValue ? node.monthlyFlow : val,
       radius: getRadiusFromValue(val),
     };
     return list;
-  }, [nodes, changedNodeId, newValue]);
+  }, [nodes, changedNodeId, parsedNewValue, parsedIsDelta, simulationChanges]);
 
   const affectedOrder = useMemo(() => {
     if (!changedNodeId) return [];
     return getAffectedNodeIds(changedNodeId, flows);
   }, [changedNodeId, flows]);
 
-  const nodeColorOverrides = useMemo(() => {
-    const m = new Map<string, string>();
-    if (!changedNodeId) return m;
-    const changedNode = afterNodes.find((n) => n.id === changedNodeId);
-    const beforeNode = nodes.find((n) => n.id === changedNodeId);
-    if (!beforeNode || !changedNode) return m;
-    const oldV = beforeNode.currentValue !== 0 ? beforeNode.currentValue : beforeNode.monthlyFlow;
-    const newV = changedNode.currentValue !== 0 ? changedNode.currentValue : changedNode.monthlyFlow;
-    m.set(changedNodeId, newV >= oldV ? HEALTH_BETTER : HEALTH_WORSE);
-    affectedOrder.forEach((id, i) => {
-      m.set(id, i % 2 === 0 ? HEALTH_BETTER : HEALTH_WORSE);
-    });
-    return m;
-  }, [changedNodeId, afterNodes, nodes, affectedOrder]);
+  const impactedNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (changedNodeId) set.add(changedNodeId);
+    affectedOrder.forEach((id) => set.add(id));
+    return set;
+  }, [changedNodeId, affectedOrder]);
+
+  /** In "after" view: the one node that was changed gets red (lowered) or green (raised) */
+  const changedNodeDirection = useMemo<"lowered" | "raised" | null>(() => {
+    if (!changedNodeId) return null;
+    const before = nodes.find((n) => n.id === changedNodeId);
+    const after = afterNodes.find((n) => n.id === changedNodeId);
+    if (!before || !after) return null;
+    const oldV = before.currentValue !== 0 ? before.currentValue : before.monthlyFlow;
+    const newV = after.currentValue !== 0 ? after.currentValue : after.monthlyFlow;
+    if (newV < oldV) return "lowered";
+    if (newV > oldV) return "raised";
+    return null;
+  }, [changedNodeId, nodes, afterNodes]);
 
   const displayNodes = viewMode === "before" ? nodes : afterNodes;
   const brightEdgeIds = useMemo(() => {
@@ -329,7 +369,6 @@ export function SimulationOverlay({
       <div
         ref={containerRef}
         className="flex-1 relative min-h-0"
-        style={{ paddingLeft: "25vw" }}
       >
         <SimulationGraph
           width={graphSize.w}
@@ -337,7 +376,9 @@ export function SimulationOverlay({
           nodes={displayNodes}
           flows={flows}
           viewMode={viewMode}
-          nodeColorOverrides={viewMode === "after" ? nodeColorOverrides : undefined}
+          changedNodeId={changedNodeId}
+          changedNodeDirection={viewMode === "after" ? changedNodeDirection : null}
+          impactedNodeIds={viewMode === "after" ? impactedNodeIds : undefined}
           pulseNodeId={phase === 1 ? changedNodeId : null}
           brightEdgeIds={phase === 3 ? brightEdgeIds : new Set()}
         />

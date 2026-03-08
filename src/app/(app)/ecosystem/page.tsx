@@ -98,6 +98,7 @@ function EcosystemDashboard() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [agentChatAgent, setAgentChatAgent] = useState<AgentType | null>(null);
+  const [agentReboundMessage, setAgentReboundMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [simulationOpen, setSimulationOpen] = useState(false);
@@ -105,6 +106,8 @@ function EcosystemDashboard() {
     responseText: string;
     nodes: GraphSnapshotNode[];
     flows: FinancialFlowData[];
+    simulationChanges?: { nodeId: string; currentValue?: number; monthlyFlow?: number }[];
+    primaryChangeNodeId?: string | null;
   } | null>(null);
   const graphSnapshotRef = useRef<{ nodes: GraphSnapshotNode[]; flows: FinancialFlowData[] } | null>(null);
 
@@ -250,16 +253,50 @@ function EcosystemDashboard() {
     graphSnapshotRef.current = { nodes, flows };
   }, []);
 
-  const handleSimulatorResponseComplete = useCallback((responseText: string) => {
-    const snap = graphSnapshotRef.current;
-    if (!snap || snap.nodes.length === 0) return;
-    setSimulationPayload({
-      responseText,
-      nodes: snap.nodes.map((n) => ({ ...n, metadata: { ...n.metadata } })),
-      flows: snap.flows.map((f) => ({ ...f })),
-    });
-    setSimulationOpen(true);
-  }, []);
+  const handleSimulatorResponseComplete = useCallback(
+    async (responseText: string, lastUserMessage?: string) => {
+      const snap = graphSnapshotRef.current;
+      if (!snap || snap.nodes.length === 0) return;
+      const nodesCopy = snap.nodes.map((n) => ({ ...n, metadata: { ...n.metadata } }));
+      const flowsCopy = snap.flows.map((f) => ({ ...f }));
+
+      let simulationChanges: { nodeId: string; currentValue?: number; monthlyFlow?: number }[] | undefined;
+      let primaryChangeNodeId: string | null | undefined;
+
+      if (lastUserMessage?.trim()) {
+        try {
+          const res = await fetch("/api/ai/simulator-json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userMessage: lastUserMessage.trim(),
+              nodes: snap.nodes,
+              flows: snap.flows,
+            }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.data?.changes?.length) {
+              simulationChanges = json.data.changes;
+              primaryChangeNodeId = json.data.primaryChangeNodeId ?? null;
+            }
+          }
+        } catch {
+          // fallback to overlay parsing
+        }
+      }
+
+      setSimulationPayload({
+        responseText,
+        nodes: nodesCopy,
+        flows: flowsCopy,
+        simulationChanges,
+        primaryChangeNodeId,
+      });
+      setSimulationOpen(true);
+    },
+    []
+  );
 
   const handleSimulationApply = useCallback(
     (updates: Map<string, { currentValue?: number; monthlyFlow?: number }>) => {
@@ -577,12 +614,21 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
         <AgentChatModal
           agent={agentChatAgent ?? "sentinel"}
           open={agentChatAgent !== null}
-          onClose={() => setAgentChatAgent(null)}
+          onClose={() => {
+            setAgentChatAgent(null);
+            setAgentReboundMessage(null);
+          }}
           financialNodes={graph.financialNodes}
           financialFlows={graph.financialFlows}
           nodeMap={graph.nodeMap}
           selectedNodeId={graph.selectedNodeId ?? undefined}
           onSimulatorResponseComplete={handleSimulatorResponseComplete}
+          onHandoff={(to, lastUserMessage) => {
+            setAgentChatAgent(to);
+            setAgentReboundMessage(lastUserMessage);
+          }}
+          reboundMessage={agentReboundMessage}
+          onClearRebound={() => setAgentReboundMessage(null)}
         />
 
         {simulationPayload && (
@@ -595,6 +641,8 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
             responseText={simulationPayload.responseText}
             nodes={simulationPayload.nodes}
             flows={simulationPayload.flows}
+            simulationChanges={simulationPayload.simulationChanges}
+            primaryChangeNodeId={simulationPayload.primaryChangeNodeId}
             onApply={handleSimulationApply}
           />
         )}
