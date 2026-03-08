@@ -1,5 +1,6 @@
 import { auth0, isAuthConfigured } from "@/lib/auth0";
 import { redirect } from "next/navigation";
+import { PageTransition } from "@/components/shared/page-transition";
 
 export default async function AppLayout({
   children,
@@ -17,7 +18,9 @@ export default async function AppLayout({
     <div className="relative flex h-screen overflow-hidden bg-black">
       <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
       <div className="absolute inset-0 bg-radial-glow pointer-events-none" />
-      <main className="relative flex-1 min-w-0">{children}</main>
+      <main className="relative flex-1 min-w-0">
+        <PageTransition>{children}</PageTransition>
+      </main>
     </div>
   );
 }

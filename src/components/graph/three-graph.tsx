@@ -68,6 +68,8 @@ export interface ThreeGraphProps {
   onDeselectNode: () => void;
   burstActive: boolean;
   interactionEnabled: boolean;
+  /** When true, the node graph intro animation (scale/opacity) has finished; only the graph content animates. */
+  graphIntroDone?: boolean;
 }
 
 /* ── Helpers ── */
@@ -118,8 +120,13 @@ export function ThreeGraph({
   financialNodes,
   financialFlows,
   nodeMap,
+  selectedNodeId,
+  connectedNodeIds,
   onSelectNode,
   onDeselectNode,
+  burstActive,
+  interactionEnabled,
+  graphIntroDone = true,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -559,33 +566,44 @@ export function ThreeGraph({
       onClick={handleCanvasClick}
       style={{ cursor: draggingRef.current ? "grabbing" : "default" }}
     >
-      {/* Zoom wrapper */}
+      {/* Static: background glow (vector + gradient) — no animation */}
+      <Image
+        src="/images/Vector.png"
+        alt=""
+        fill
+        className="object-cover pointer-events-none select-none"
+        style={{ opacity: 0.22, zIndex: 0 }}
+        priority
+      />
       <div
-        className="relative"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          width: "100%",
-          height: "100%",
-          transform: zoomTransform ?? "none",
-          transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
-          transformOrigin: "0 0",
+          zIndex: 0,
+          background: "radial-gradient(ellipse 80% 70% at 50% 50%, rgba(127, 127, 250, 0.14) 0%, rgba(127, 127, 250, 0.04) 50%, transparent 75%)",
+        }}
+      />
+
+      {/* Only the node graph (zoom wrapper + edges + nodes) animates */}
+      <div
+        className="absolute inset-0 origin-center"
+        style={{
+          zIndex: 1,
+          opacity: graphIntroDone ? 1 : 0,
+          transform: graphIntroDone ? "scale(1)" : "scale(0.65)",
+          transition: "opacity 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 700ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
         }}
       >
-        {/* Glow behind nodes: Vector texture + radial gradient (Figma-style) */}
-        <Image
-          src="/images/Vector.png"
-          alt=""
-          fill
-          className="object-cover pointer-events-none select-none"
-          style={{ opacity: 0.22, zIndex: 0 }}
-          priority
-        />
+        {/* Zoom wrapper */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="relative"
           style={{
-            zIndex: 0,
-            background: "radial-gradient(ellipse 80% 70% at 50% 50%, rgba(127, 127, 250, 0.14) 0%, rgba(127, 127, 250, 0.04) 50%, transparent 75%)",
+            width: "100%",
+            height: "100%",
+            transform: zoomTransform ?? "none",
+            transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+            transformOrigin: "0 0",
           }}
-        />
+        >
         {/* SVG edges — same coordinate space as nodes so lines move with nodes */}
         <svg
           className="absolute inset-0 w-full h-full"
@@ -731,8 +749,9 @@ export function ThreeGraph({
           );
         })}
       </div>
+      </div>
 
-      {/* Toggle buttons — top right, outside zoom wrapper */}
+      {/* Static: Flow button — no animation */}
       <div
         className="absolute top-4 right-4 flex flex-col gap-2"
         style={{ zIndex: 20 }}

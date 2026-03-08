@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { FincoLogo } from "@/components/shared/logo";
 
 export function Navbar() {
@@ -12,12 +13,15 @@ export function Navbar() {
           <FincoLogo size="lg" />
         </Link>
         <div className="flex w-[80px] justify-end">
-          <a
+          <motion.a
             href="/auth/login?returnTo=/ecosystem"
             className="inline-flex h-[40px] items-center justify-center rounded-full bg-finco-blue px-6 font-sans text-sm font-bold text-black transition-colors hover:bg-finco-blue/90"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
           >
             Login
-          </a>
+          </motion.a>
         </div>
       </div>
     </nav>

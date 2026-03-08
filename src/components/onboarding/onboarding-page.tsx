@@ -38,8 +38,6 @@ const GOALS = [
   { id: "networth", label: "Track net worth", icon: BarChart3 },
 ] as const;
 
-const CURRENCIES = ["CAD", "USD", "EUR", "GBP"] as const;
-
 function parseName(fullName: string | undefined): { firstName: string; lastName: string } {
   if (!fullName?.trim()) return { firstName: "", lastName: "" };
   const parts = fullName.trim().split(/\s+/);
@@ -58,7 +56,8 @@ export function OnboardingPage({
   const [firstName, setFirstName] = useState(initialFirst);
   const [lastName, setLastName] = useState(initialLast);
   const [goals, setGoals] = useState<Set<string>>(new Set());
-  const [currency, setCurrency] = useState<string>("CAD");
+  const [goalsOther, setGoalsOther] = useState("");
+  const [priorityNote, setPriorityNote] = useState("");
   const [onboardingNodes, setOnboardingNodes] = useState<FinancialNodeData[]>([]);
   const [onboardingFlows, setOnboardingFlows] = useState<FinancialFlowData[]>([]);
 
@@ -125,14 +124,20 @@ export function OnboardingPage({
         JSON.stringify({
           nodes: onboardingNodes,
           flows: onboardingFlows,
-          profile: { firstName, lastName, goals: Array.from(goals), currency },
+          profile: {
+            firstName,
+            lastName,
+            goals: Array.from(goals),
+            goalsOther: goalsOther.trim() || undefined,
+            priorityNote: priorityNote.trim() || undefined,
+          },
         })
       );
     } catch {
       /* noop */
     }
     router.push("/ecosystem");
-  }, [onboardingNodes, onboardingFlows, firstName, lastName, goals, currency, router]);
+  }, [onboardingNodes, onboardingFlows, firstName, lastName, goals, goalsOther, priorityNote, router]);
 
   const addedCount = onboardingNodes.length;
 
@@ -208,33 +213,15 @@ export function OnboardingPage({
               />
             </div>
 
-            {/* Currency */}
+            {/* User input we store */}
             <div className="mt-6">
-              <p
-                className="font-sans mb-2"
-                style={{ fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em" }}
-              >
-                Primary Currency
-              </p>
-              <div className="flex gap-2">
-                {CURRENCIES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCurrency(c)}
-                    className="font-sans rounded-lg px-4 py-2 transition-all"
-                    style={{
-                      background: currency === c ? "rgba(127,127,250,0.10)" : "#0a0a14",
-                      border: currency === c ? "1px solid #7F7FFA" : "1px solid #1a1a2e",
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: currency === c ? "#7F7FFA" : "#6b6b9a",
-                    }}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
+              <InputField
+                id="priorityNote"
+                label="What's your biggest financial priority right now?"
+                value={priorityNote}
+                onChange={setPriorityNote}
+                placeholder="e.g. Save for a down payment, pay off credit card, build emergency fund"
+              />
             </div>
 
             {/* Financial Goals */}
@@ -276,6 +263,24 @@ export function OnboardingPage({
                     </button>
                   );
                 })}
+              </div>
+              {/* Other goals (free text) */}
+              <div className="mt-3">
+                <p
+                  className="font-sans mb-1.5"
+                  style={{ fontWeight: 600, fontSize: 12, color: "#6b6b9a" }}
+                >
+                  Other
+                </p>
+                <input
+                  id="goalsOther"
+                  type="text"
+                  value={goalsOther}
+                  onChange={(e) => setGoalsOther(e.target.value)}
+                  placeholder="Any other goals or notes..."
+                  className="font-sans w-full rounded-lg border bg-[#0a0a14] px-3 py-2.5 outline-none transition placeholder:text-[#3a3a5a] focus:border-[#7F7FFA]/40"
+                  style={{ borderColor: "#1a1a2e", color: "#e8e8ff", fontSize: 14 }}
+                />
               </div>
             </div>
 

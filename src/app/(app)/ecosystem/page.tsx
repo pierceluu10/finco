@@ -249,7 +249,7 @@ function EcosystemDashboard() {
 
   return (
     <>
-      {/* ── PHASE 1 — Intro logo overlay ── */}
+      {/* ── PHASE 1 — Intro overlay: "Your Financial Ecosystem." ── */}
       {!sidebarIn && (
         <div
           className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
@@ -268,16 +268,16 @@ function EcosystemDashboard() {
               </span>
             </div>
             <p
-              className="font-sans mt-3"
-              style={{ fontWeight: 500, fontSize: 16, color: "#6b6b9a" }}
+              className="font-sans mt-3 font-semibold tracking-[-0.01em]"
+              style={{ fontSize: 20, color: "#e8e8ff" }}
             >
-              Your financial ecosystem
+              Your Financial Ecosystem.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Main layout (starts invisible, fades in per phase) ── */}
+      {/* ── Main layout: background and UI static; only node graph animates (inside ThreeGraph) ── */}
       <div
         className="h-full w-full"
         style={{
@@ -305,6 +305,7 @@ function EcosystemDashboard() {
         />
 
         <div className="relative h-full overflow-hidden">
+          {/* Background and vector: no animation, always visible when content is shown */}
           <Image
             src="/images/Vector.png"
             alt=""
@@ -314,37 +315,24 @@ function EcosystemDashboard() {
             priority
           />
 
-          <div
-            className="absolute inset-0 origin-center"
-            style={{
-              zIndex: 1,
-              opacity: graphIn ? 1 : 0,
-              transform: graphIn ? "scale(1)" : "scale(0.65)",
-              transition: "opacity 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 700ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-            }}
-          >
-            <ThreeGraph
-              rfNodes={graph.rfNodes}
-              financialNodes={graph.financialNodes}
-              financialFlows={graph.financialFlows}
-              nodeMap={graph.nodeMap}
-              selectedNodeId={graph.selectedNodeId}
-              connectedNodeIds={graph.connectedNodeIds}
-              onSelectNode={handleSelectNode}
-              onDeselectNode={graph.deselectNode}
-              burstActive={burstActive}
-              interactionEnabled={interactionEnabled}
-            />
-          </div>
+          {/* Only the node graph (ThreeGraph) has intro animation; background/vector/Flow stay still */}
+          <ThreeGraph
+            rfNodes={graph.rfNodes}
+            financialNodes={graph.financialNodes}
+            financialFlows={graph.financialFlows}
+            nodeMap={graph.nodeMap}
+            selectedNodeId={graph.selectedNodeId}
+            connectedNodeIds={graph.connectedNodeIds}
+            onSelectNode={handleSelectNode}
+            onDeselectNode={graph.deselectNode}
+            burstActive={burstActive}
+            interactionEnabled={interactionEnabled}
+            graphIntroDone={graphIn}
+          />
 
           <div
             className="absolute bottom-4 left-4"
-            style={{
-              zIndex: 10,
-              opacity: uiIn ? 1 : 0,
-              transition: "opacity 300ms ease-out",
-              transitionDelay: "100ms",
-            }}
+            style={{ zIndex: 10 }}
           >
             <GraphLegend />
           </div>
