@@ -178,10 +178,10 @@ export function ThreeGraph({
     return () => ro.disconnect();
   }, []);
 
-  // Compute radii
+  // Compute radii (use magnitude so negative balances e.g. credit card get proper size)
   const radiiMap = useMemo(() => {
     const weights = financialNodes.map(
-      (n) => Math.max(n.currentValue, n.monthlyFlow) || 1
+      (n) => Math.max(Math.abs(n.currentValue), n.monthlyFlow) || 1
     );
     const minW = Math.min(...weights);
     const maxW = Math.max(...weights);
@@ -274,11 +274,12 @@ export function ThreeGraph({
 
     const updated: NodeView[] = financialNodes.map((fn, i) => {
       const sn = simNodes[i];
+      const displayAmount = fn.currentValue !== 0 ? fn.currentValue : (fn.monthlyFlow ?? 0);
       return {
         id: fn.id,
         label: fn.label,
         type: fn.type as FinancialNodeType,
-        amount: Math.max(fn.currentValue, fn.monthlyFlow) || 1,
+        amount: displayAmount,
         radius: sn.radius,
         color: getNodeColor(fn.type as FinancialNodeType),
         x: sn.x ?? cx,
