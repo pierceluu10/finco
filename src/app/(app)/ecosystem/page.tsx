@@ -16,9 +16,11 @@ import { AddNodeDialog } from "@/components/panels/add-node-dialog";
 import { DeleteConfirmDialog } from "@/components/panels/delete-confirm-dialog";
 import { CsvUploadDialog } from "@/components/panels/csv-upload-dialog";
 import { AgentChatModal } from "@/components/panels/agent-chat-modal";
-import { SimulationOverlay } from "@/components/panels/simulation-overlay";
+import { SimulationBottomPanel } from "@/components/panels/simulation-bottom-panel";
 import { StemNodeModal } from "@/components/panels/stem-node-modal";
-import type { GraphSnapshotNode } from "@/components/graph/three-graph";
+import { useGraphStore } from "@/stores/graph-store";
+import { computeRipple } from "@/lib/simulation-ripple";
+import { formatCurrency } from "@/lib/utils";
 import type {
   DialogMode,
   FinancialNodeData,
@@ -67,8 +69,9 @@ function EcosystemDashboard() {
     setSidebarCollapsed((prev) => !prev);
   }, []);
 
-  // ── Entry sequence — always plays on mount, no sessionStorage ──
+  // ── Entry sequence — always plays on mount; logo + text then swipe up and reveal content ──
   const [sidebarIn, setSidebarIn] = useState(false);
+  const [introSwipeUp, setIntroSwipeUp] = useState(false);
   const [contentIn, setContentIn] = useState(false);
   const [graphIn, setGraphIn] = useState(false);
   const [_uiIn, setUiIn] = useState(false);
@@ -76,14 +79,19 @@ function EcosystemDashboard() {
   const [burstActive, setBurstActive] = useState(false);
   const [interactionEnabled, setInteractionEnabled] = useState(false);
 
+  const INTRO_SHOW_MS = 900;
+  const INTRO_SWIPE_DURATION_MS = 650;
+  const INTRO_OVERLAY_END_MS = INTRO_SHOW_MS + INTRO_SWIPE_DURATION_MS;
+
   useEffect(() => {
     const timers = [
-      setTimeout(() => setSidebarIn(true), 1200),
-      setTimeout(() => setContentIn(true), 1400),
-      setTimeout(() => { setGraphIn(true); setBurstActive(true); }, 1700),
-      setTimeout(() => setUiIn(true), 1900),
-      setTimeout(() => setInteractionEnabled(true), 2200),
-      setTimeout(() => setIntroDone(true), 3500),
+      setTimeout(() => setIntroSwipeUp(true), INTRO_SHOW_MS),
+      setTimeout(() => setSidebarIn(true), INTRO_OVERLAY_END_MS),
+      setTimeout(() => setContentIn(true), INTRO_OVERLAY_END_MS + 200),
+      setTimeout(() => { setGraphIn(true); setBurstActive(true); }, INTRO_OVERLAY_END_MS + 500),
+      setTimeout(() => setUiIn(true), INTRO_OVERLAY_END_MS + 700),
+      setTimeout(() => setInteractionEnabled(true), INTRO_OVERLAY_END_MS + 1000),
+      setTimeout(() => setIntroDone(true), INTRO_OVERLAY_END_MS + 2300),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -101,15 +109,24 @@ function EcosystemDashboard() {
   const [agentReboundMessage, setAgentReboundMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [simulationOpen, setSimulationOpen] = useState(false);
-  const [simulationPayload, setSimulationPayload] = useState<{
-    responseText: string;
-    nodes: GraphSnapshotNode[];
-    flows: FinancialFlowData[];
-    simulationChanges?: { nodeId: string; currentValue?: number; monthlyFlow?: number }[];
-    primaryChangeNodeId?: string | null;
+
+  // ── Simulation mode (double-click node → slider → ripple live; on release → stream Simulator → Apply/Discard) ──
+  const [simulationMode, setSimulationMode] = useState(false);
+  const [simulationNodeId, setSimulationNodeId] = useState<string | null>(null);
+  const simulationOriginalRef = useRef<FinancialNodeData[] | null>(null);
+  const [simulationStreamedText, setSimulationStreamedText] = useState("");
+  const [simulationStreaming, setSimulationStreaming] = useState(false);
+  const [simulationPanelOpen, setSimulationPanelOpen] = useState(false);
+  /** True after user clicks Apply to Ecosystem: show End simulation next to Flow until refresh */
+  const [simulationJustApplied, setSimulationJustApplied] = useState(false);
+  /** Overlay notification: which nodes changed and by how much (ripple summary) */
+  const [simulationChangeNotification, setSimulationChangeNotification] = useState<{
+    fromNodeLabel: string;
+    changes: Array<{ nodeId: string; label: string; oldVal: number; newVal: number }>;
   } | null>(null);
-  const graphSnapshotRef = useRef<{ nodes: GraphSnapshotNode[]; flows: FinancialFlowData[] } | null>(null);
+  const simulationChangeNotificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const graphSnapshotRef = useRef<{ nodes: unknown[]; flows: FinancialFlowData[] } | null>(null);
 
   const [stemModalOpen, setStemModalOpen] = useState(false);
   const [stemParentNode, setStemParentNode] = useState<FinancialNodeData | null>(null);
@@ -249,68 +266,207 @@ function EcosystemDashboard() {
     [graph]
   );
 
-  const handleGraphSnapshot = useCallback((nodes: GraphSnapshotNode[], flows: FinancialFlowData[]) => {
+  const handleGraphSnapshot = useCallback((nodes: unknown[], flows: FinancialFlowData[]) => {
     graphSnapshotRef.current = { nodes, flows };
   }, []);
 
-  const handleSimulatorResponseComplete = useCallback(
-    async (responseText: string, lastUserMessage?: string) => {
-      const snap = graphSnapshotRef.current;
-      if (!snap || snap.nodes.length === 0) return;
-      const nodesCopy = snap.nodes.map((n) => ({ ...n, metadata: { ...n.metadata } }));
-      const flowsCopy = snap.flows.map((f) => ({ ...f }));
+  const handleEnterSimulation = useCallback((nodeId: string) => {
+    const store = useGraphStore.getState();
+    const snapshot = store.nodes.map((n) => ({ ...n, metadata: { ...n.metadata } }));
+    simulationOriginalRef.current = snapshot;
+    setSimulationNodeId(nodeId);
+    setSimulationMode(true);
+    setSimulationPanelOpen(false);
+    setSimulationStreamedText("");
+  }, []);
 
-      let simulationChanges: { nodeId: string; currentValue?: number; monthlyFlow?: number }[] | undefined;
-      let primaryChangeNodeId: string | null | undefined;
+  const handleSimulationChange = useCallback((nodeId: string, value: number) => {
+    const original = simulationOriginalRef.current;
+    if (!original?.length) return;
+    const flows = useGraphStore.getState().edges;
+    const rippleNodes = computeRipple(original, flows, nodeId, value);
+    useGraphStore.getState().init(rippleNodes, flows);
 
-      if (lastUserMessage?.trim()) {
-        try {
-          const res = await fetch("/api/ai/simulator-json", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userMessage: lastUserMessage.trim(),
-              nodes: snap.nodes,
-              flows: snap.flows,
-            }),
-          });
-          if (res.ok) {
-            const json = await res.json();
-            if (json.data?.changes?.length) {
-              simulationChanges = json.data.changes;
-              primaryChangeNodeId = json.data.primaryChangeNodeId ?? null;
-            }
-          }
-        } catch {
-          // fallback to overlay parsing
-        }
+    // Build overlay notification: which nodes changed, why, by how much
+    const getNodeVal = (n: FinancialNodeData) =>
+      n.type === "income" || n.type === "expense" ? n.monthlyFlow : n.currentValue;
+    const fromNode = original.find((n) => n.id === nodeId);
+    const fromNodeLabel = fromNode?.label ?? nodeId;
+    const changes: Array<{ nodeId: string; label: string; oldVal: number; newVal: number }> = [];
+    for (const orig of original) {
+      const after = rippleNodes.find((n) => n.id === orig.id);
+      if (!after) continue;
+      const oldV = getNodeVal(orig);
+      const newV = getNodeVal(after);
+      if (oldV !== newV) {
+        changes.push({
+          nodeId: orig.id,
+          label: orig.label,
+          oldVal: oldV,
+          newVal: newV,
+        });
       }
+    }
+    if (simulationChangeNotificationTimerRef.current) {
+      clearTimeout(simulationChangeNotificationTimerRef.current);
+    }
+    setSimulationChangeNotification(
+      changes.length > 0 ? { fromNodeLabel, changes } : null
+    );
+    simulationChangeNotificationTimerRef.current = setTimeout(() => {
+      setSimulationChangeNotification(null);
+      simulationChangeNotificationTimerRef.current = null;
+    }, 6000);
+  }, []);
 
-      setSimulationPayload({
-        responseText,
-        nodes: nodesCopy,
-        flows: flowsCopy,
-        simulationChanges,
-        primaryChangeNodeId,
+  const handleSimulationRelease = useCallback((nodeId: string) => {
+    const original = simulationOriginalRef.current;
+    const store = useGraphStore.getState();
+    const after = store.nodes;
+    if (!original?.length || !after.length) return;
+    const node = after.find((n) => n.id === nodeId);
+    const label = node?.label ?? nodeId;
+    const origNode = original.find((n) => n.id === nodeId);
+    const oldVal = origNode ? (origNode.currentValue !== 0 ? origNode.currentValue : origNode.monthlyFlow) : 0;
+    const newVal = node ? (node.currentValue !== 0 ? node.currentValue : node.monthlyFlow) : 0;
+    setSimulationStreamedText("");
+    setSimulationStreaming(true);
+    setSimulationPanelOpen(true);
+    fetch("/api/ai/simulator-stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        beforeNodes: original,
+        afterNodes: after,
+        flows: store.edges,
+        changedNodeId: nodeId,
+        changedLabel: label,
+        oldValue: oldVal,
+        newValue: newVal,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok || !res.body) throw new Error("Stream failed");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+        function pump(): Promise<void> {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              setSimulationStreaming(false);
+              return;
+            }
+            acc += decoder.decode(value, { stream: true });
+            setSimulationStreamedText(acc);
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .catch(() => {
+        setSimulationStreamedText("Unable to load Simulator response.");
+        setSimulationStreaming(false);
       });
-      setSimulationOpen(true);
-    },
-    []
-  );
+  }, []);
 
-  const handleSimulationApply = useCallback(
-    (updates: Map<string, { currentValue?: number; monthlyFlow?: number }>) => {
-      updates.forEach((val, id) => {
-        graph.updateNode(id, val);
+  const handleSimulationApply = useCallback(() => {
+    const original = simulationOriginalRef.current;
+    const nodeId = simulationNodeId;
+    if (!original?.length || !nodeId) return;
+    const store = useGraphStore.getState();
+    const after = store.nodes;
+    setSimulationMode(false);
+    setSimulationNodeId(null);
+    simulationOriginalRef.current = null;
+    setSimulationChangeNotification(null);
+    if (simulationChangeNotificationTimerRef.current) {
+      clearTimeout(simulationChangeNotificationTimerRef.current);
+      simulationChangeNotificationTimerRef.current = null;
+    }
+    setSimulationJustApplied(true);
+    setSimulationPanelOpen(false);
+    setSimulationStreamedText("");
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast("Simulation applied to your ecosystem");
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+    // Run Simulator only after apply (generate comments; no node edits in API, so no loop)
+    const label = after.find((n) => n.id === nodeId)?.label ?? nodeId;
+    const origNode = original.find((n) => n.id === nodeId);
+    const getVal = (n: FinancialNodeData) => (n.type === "income" || n.type === "expense" ? n.monthlyFlow : n.currentValue);
+    const oldVal = origNode ? getVal(origNode) : 0;
+    const changedNode = after.find((n) => n.id === nodeId);
+    const newVal = changedNode ? getVal(changedNode) : 0;
+    setSimulationStreaming(true);
+    setSimulationPanelOpen(true);
+    fetch("/api/ai/simulator-stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        beforeNodes: original,
+        afterNodes: after,
+        flows: store.edges,
+        changedNodeId: nodeId,
+        changedLabel: label,
+        oldValue: oldVal,
+        newValue: newVal,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok || !res.body) throw new Error("Stream failed");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+        function pump(): Promise<void> {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              setSimulationStreaming(false);
+              return;
+            }
+            acc += decoder.decode(value, { stream: true });
+            setSimulationStreamedText(acc);
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .catch(() => {
+        setSimulationStreamedText("Unable to load Simulator response.");
+        setSimulationStreaming(false);
       });
-      setSimulationOpen(false);
-      setSimulationPayload(null);
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      setToast("Simulation applied to your ecosystem");
-      toastTimerRef.current = setTimeout(() => setToast(null), 3500);
-    },
-    [graph]
-  );
+  }, [simulationNodeId]);
+
+  const handleSimulationDiscard = useCallback(() => {
+    const original = simulationOriginalRef.current;
+    if (original?.length) {
+      const store = useGraphStore.getState();
+      useGraphStore.getState().init(original, store.edges);
+    }
+    setSimulationMode(false);
+    setSimulationNodeId(null);
+    simulationOriginalRef.current = null;
+    setSimulationPanelOpen(false);
+    setSimulationStreamedText("");
+    setSimulationChangeNotification(null);
+    if (simulationChangeNotificationTimerRef.current) {
+      clearTimeout(simulationChangeNotificationTimerRef.current);
+      simulationChangeNotificationTimerRef.current = null;
+    }
+  }, []);
+
+  /** End simulation by refreshing the ecosystem page (resets all state) */
+  const handleEndSimulation = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  // Escape to discard simulation
+  useEffect(() => {
+    if (!simulationMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleSimulationDiscard();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [simulationMode, handleSimulationDiscard]);
 
   const handleUpdateNodeValue = useCallback(
     (nodeId: string, value: number, field: "currentValue" | "monthlyFlow") => {
@@ -476,15 +632,31 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
 
   return (
     <>
-      {/* ── PHASE 1 — Intro overlay: "Your Financial Ecosystem." ── */}
+      {/* ── PHASE 1 — Intro overlay: logo + Finco + tagline, then swipe up and reveal content ── */}
       {!sidebarIn && (
         <div
-          className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden"
           style={{ background: "#050508" }}
         >
+          <style>{`
+            @keyframes introSwipeUp {
+              from {
+                transform: translateY(0);
+                opacity: 1;
+              }
+              to {
+                transform: translateY(-120vh);
+                opacity: 0.3;
+              }
+            }
+          `}</style>
           <div
             className="text-center"
-            style={{ animation: "introLogoSeq 1200ms cubic-bezier(0.4,0,0.2,1) forwards" }}
+            style={{
+              animation: introSwipeUp
+                ? `introSwipeUp ${INTRO_SWIPE_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1) forwards`
+                : "none",
+            }}
           >
             <div className="flex items-center justify-center gap-2.5">
               <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 448 512">
@@ -567,6 +739,16 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
               setDeleteTarget(nodeId);
               setDeleteDialogOpen(true);
             }}
+            simulationMode={simulationMode}
+            simulationNodeId={simulationNodeId}
+            simulationOriginalNodes={simulationMode ? simulationOriginalRef.current : null}
+            onEnterSimulation={handleEnterSimulation}
+            onSimulationChange={handleSimulationChange}
+            onSimulationRelease={handleSimulationRelease}
+            onSimulationDiscard={handleEndSimulation}
+            onSimulationApply={handleSimulationApply}
+            simulationJustApplied={simulationJustApplied}
+            onEndSimulationAfterApply={handleEndSimulation}
           />
 
           <div
@@ -622,7 +804,7 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
           financialFlows={graph.financialFlows}
           nodeMap={graph.nodeMap}
           selectedNodeId={graph.selectedNodeId ?? undefined}
-          onSimulatorResponseComplete={handleSimulatorResponseComplete}
+          onSimulatorResponseComplete={undefined}
           onHandoff={(to, lastUserMessage) => {
             setAgentChatAgent(to);
             setAgentReboundMessage(lastUserMessage);
@@ -631,20 +813,66 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
           onClearRebound={() => setAgentReboundMessage(null)}
         />
 
-        {simulationPayload && (
-          <SimulationOverlay
-            open={simulationOpen}
-            onClose={() => {
-              setSimulationOpen(false);
-              setSimulationPayload(null);
+        <SimulationBottomPanel
+          open={simulationPanelOpen}
+          streamedText={simulationStreamedText}
+          streaming={simulationStreaming}
+          onApply={handleEndSimulation}
+          onDiscard={() => setSimulationPanelOpen(false)}
+        />
+
+        {/* Simulation change notification — which nodes changed, why, by how much */}
+        {simulationMode && simulationChangeNotification && (
+          <div
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[250] rounded-xl px-4 py-3 max-w-[90vw] shadow-2xl"
+            style={{
+              fontFamily: "'Manrope', sans-serif",
+              background: "rgba(8,8,15,0.97)",
+              border: "1px solid rgba(127,127,250,0.35)",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(127,127,250,0.15)",
+              animation: "toastIn 300ms ease",
             }}
-            responseText={simulationPayload.responseText}
-            nodes={simulationPayload.nodes}
-            flows={simulationPayload.flows}
-            simulationChanges={simulationPayload.simulationChanges}
-            primaryChangeNodeId={simulationPayload.primaryChangeNodeId}
-            onApply={handleSimulationApply}
-          />
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#7F7FFA" }}>
+              Simulator — real-time changes
+            </div>
+            <p className="text-[12px] text-[#9a9abe] mb-2">
+              Rippled from <span className="font-semibold text-[#e8e8ff]">{simulationChangeNotification.fromNodeLabel}</span>
+            </p>
+            <ul className="space-y-1.5">
+              {simulationChangeNotification.changes.map((c) => {
+                const delta = c.newVal - c.oldVal;
+                const isUp = delta > 0;
+                return (
+                  <li key={c.nodeId} className="text-[13px] leading-snug">
+                    <span className="font-semibold text-[#e8e8ff]">{c.label}</span>
+                    {" — "}
+                    <span className={isUp ? "text-[#00ff88]" : "text-[#f87171]"}>
+                      {isUp ? "+" : ""}{formatCurrency(delta)}
+                    </span>
+                    {" "}
+                    <span className="text-[#6b6b9a]">
+                      ({formatCurrency(c.oldVal)} → {formatCurrency(c.newVal)})
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              type="button"
+              onClick={() => {
+                setSimulationChangeNotification(null);
+                if (simulationChangeNotificationTimerRef.current) {
+                  clearTimeout(simulationChangeNotificationTimerRef.current);
+                  simulationChangeNotificationTimerRef.current = null;
+                }
+              }}
+              className="mt-2 text-[11px] font-semibold rounded px-2 py-1 transition opacity-80 hover:opacity-100"
+              style={{ color: "#7F7FFA" }}
+            >
+              Dismiss
+            </button>
+          </div>
         )}
 
         {stemModalOpen && stemParentNode && stemParentPosition && (

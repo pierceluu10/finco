@@ -80,6 +80,21 @@ export interface ThreeGraphProps {
   onCancelLinkMode?: () => void;
   flashNodeId?: string | null;
   onRequestDeleteNode?: (nodeId: string) => void;
+  /** Simulation mode: double-click a node to enter; slider controls value, ripple runs live */
+  simulationMode?: boolean;
+  simulationNodeId?: string | null;
+  /** Original node values when simulation started (for red/green/dim) */
+  simulationOriginalNodes?: FinancialNodeData[] | null;
+  onEnterSimulation?: (nodeId: string) => void;
+  onSimulationChange?: (nodeId: string, value: number) => void;
+  onSimulationRelease?: (nodeId: string) => void;
+  /** End simulation and discard changes (e.g. refresh) */
+  onSimulationDiscard?: () => void;
+  /** Apply simulation to ecosystem; Simulator runs only after this */
+  onSimulationApply?: () => void;
+  /** Show End simulation button next to Flow (after apply); click refreshes */
+  simulationJustApplied?: boolean;
+  onEndSimulationAfterApply?: () => void;
 }
 
 /** Node data + layout position for simulation overlay snapshot */
@@ -164,6 +179,16 @@ export function ThreeGraph({
   onCancelLinkMode,
   flashNodeId = null,
   onRequestDeleteNode,
+  simulationMode = false,
+  simulationNodeId = null,
+  simulationOriginalNodes = null,
+  onEnterSimulation,
+  onSimulationChange,
+  onSimulationRelease,
+  onSimulationDiscard,
+  onSimulationApply,
+  simulationJustApplied = false,
+  onEndSimulationAfterApply,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -174,6 +199,9 @@ export function ThreeGraph({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [flowView, setFlowView] = useState(true);
+  /** Value shown in simulation number input; synced from store when not focused */
+  const [simInputValue, setSimInputValue] = useState("");
+  const [simInputFocused, setSimInputFocused] = useState(false);
 
   useEffect(() => {
     setSelectedId(selectedNodeIdProp);
@@ -205,6 +233,32 @@ export function ThreeGraph({
     }
     return s;
   }, [hoveredId, selectedId, financialFlows]);
+
+  // Simulation mode: per-node color (red/green) and dim for unchanged
+  const simulationDisplayMap = useMemo(() => {
+    if (!simulationMode || !simulationOriginalNodes?.length) return null;
+    const originalById = new Map(
+      simulationOriginalNodes.map((n) => [
+        n.id,
+        n.currentValue !== 0 ? n.currentValue : n.monthlyFlow,
+      ])
+    );
+    const map = new Map<
+      string,
+      { color: string; dimmed: boolean }
+    >();
+    for (const node of nodes) {
+      const orig = originalById.get(node.id) ?? node.amount;
+      if (node.amount < orig) {
+        map.set(node.id, { color: HEALTH_NEG, dimmed: false });
+      } else if (node.amount > orig) {
+        map.set(node.id, { color: HEALTH_POS, dimmed: false });
+      } else {
+        map.set(node.id, { color: node.color, dimmed: true });
+      }
+    }
+    return map;
+  }, [simulationMode, simulationOriginalNodes, nodes]);
 
   // Flows connected to selected/hovered node
   const connectedFlows = useMemo(() => {
@@ -532,17 +586,21 @@ export function ThreeGraph({
     [selectedId, linkModeSourceId, onLinkTargetSelected, posMap, onSelectNode, onDeselectNode, size.w, size.h, fitView]
   );
 
-  const handleCanvasClick = useCallback(() => {
-    if (didPanRef.current) {
-      didPanRef.current = false;
-      return;
-    }
-    if (selectedId) {
-      setSelectedId(null);
-      fitView();
-      onDeselectNode();
-    }
-  }, [selectedId, onDeselectNode, fitView]);
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-simulate-overlay]")) return;
+      if (didPanRef.current) {
+        didPanRef.current = false;
+        return;
+      }
+      if (selectedId) {
+        setSelectedId(null);
+        fitView();
+        onDeselectNode();
+      }
+    },
+    [selectedId, onDeselectNode, fitView]
+  );
 
   useEffect(() => {
     if (!linkModeSourceId) return;
@@ -677,6 +735,27 @@ export function ThreeGraph({
     };
   }, [selectedId, posMap, camera]);
 
+  // Sync simulation input from store when not focused
+  useEffect(() => {
+    if (!simulationMode || !simulationNodeId) return;
+    if (simInputFocused) return;
+    const simNode = nodes.find((n) => n.id === simulationNodeId);
+    const amt = simNode?.amount ?? 0;
+    setSimInputValue(String(amt));
+  }, [simulationMode, simulationNodeId, simInputFocused, nodes]);
+
+  // Debounced live ripple: while typing, apply value after pause so graph/dashboard/Sentinel update in real time
+  useEffect(() => {
+    if (!simulationMode || !simulationNodeId || !onSimulationChange || !simInputFocused) return;
+    const raw = simInputValue.trim();
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v) || v < 0) return;
+    const t = setTimeout(() => {
+      onSimulationChange(simulationNodeId, v);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [simulationMode, simulationNodeId, simInputFocused, simInputValue, onSimulationChange]);
+
   return (
     <div
       ref={containerRef}
@@ -684,7 +763,7 @@ export function ThreeGraph({
       onClick={handleCanvasClick}
       onMouseDown={(e) => {
         const t = e.target as HTMLElement;
-        if (t.closest("button") || t.closest("[data-node-id]") || t.closest("[data-node-popup]")) return;
+        if (t.closest("button") || t.closest("[data-node-id]") || t.closest("[data-node-popup]") || t.closest("[data-simulate-overlay]")) return;
         e.preventDefault();
         isPanningRef.current = true;
         didPanRef.current = false;
@@ -700,8 +779,9 @@ export function ThreeGraph({
       {/* Link mode banner */}
       {linkModeSourceId && (
         <div
-          className="absolute top-0 left-0 right-0 z-[100] font-sans font-semibold text-[13px] text-[#e8e8ff] px-4 py-3.5"
+          className="absolute top-0 left-0 right-0 z-[100] font-semibold text-[13px] text-[#e8e8ff] px-4 py-3.5"
           style={{
+            fontFamily: "'Manrope', sans-serif",
             background: "rgba(8,8,15,0.95)",
             borderBottom: "1px solid #1a1a2e",
           }}
@@ -831,6 +911,9 @@ export function ThreeGraph({
           if (linkModeSourceId) {
             dimmed = !isLinkSource;
           }
+          const simDisplay = simulationMode ? simulationDisplayMap?.get(node.id) : null;
+          const displayColor = simDisplay?.color ?? node.color;
+          if (simulationMode && simDisplay) dimmed = simDisplay.dimmed;
           return (
             <div
               key={node.id}
@@ -859,16 +942,16 @@ export function ThreeGraph({
                   width: node.radius * 2,
                   height: node.radius * 2,
                   borderRadius: "50%",
-                  background: darken(node.color, 0.15),
+                  background: darken(displayColor, 0.15),
                   boxShadow: isLinkSource
                     ? `0 0 0 2px #00ff88, 0 0 20px rgba(0,255,136,0.5)`
                     : isFlash
                       ? `0 0 24px rgba(0,255,136,0.8), 0 0 40px rgba(0,255,136,0.3)`
                       : isHovered || isSelected
-                        ? `0 0 20px ${node.color}40`
+                        ? `0 0 20px ${displayColor}40`
                         : "none",
                   transition: "box-shadow 200ms ease",
-                  border: `1.5px solid ${node.color}30`,
+                  border: `1.5px solid ${displayColor}30`,
                   position: "relative",
                   zIndex: 2,
                   animation: isLinkSource ? "link-source-pulse 1.5s ease-in-out infinite" : undefined,
@@ -902,7 +985,7 @@ export function ThreeGraph({
                   style={{
                     fontFamily: "'Manrope', sans-serif",
                     fontSize: 9,
-                    color: node.color,
+                    color: displayColor,
                     lineHeight: 1.25,
                     fontWeight: 500,
                   }}
@@ -916,12 +999,29 @@ export function ThreeGraph({
       </div>
       </div>
 
-      {/* Static: Flow button — no animation */}
+      {/* Static: Flow button and End simulation (after apply) — no animation */}
       <div
         className="absolute top-4 right-4 flex flex-col gap-2"
         style={{ zIndex: 20 }}
       >
-        <button
+        <div className="flex items-center gap-2">
+          {simulationJustApplied && onEndSimulationAfterApply && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEndSimulationAfterApply(); }}
+              className="rounded-full px-3 py-1.5 text-[11px] font-semibold transition"
+              style={{
+                fontFamily: "'Manrope', sans-serif",
+                background: "rgba(248,113,113,0.15)",
+                border: "1px solid rgba(248,113,113,0.45)",
+                color: "#f87171",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              End simulation
+            </button>
+          )}
+          <button
           onClick={(e) => {
             e.stopPropagation();
             setFlowView((v) => !v);
@@ -940,10 +1040,11 @@ export function ThreeGraph({
           <Workflow className="w-3 h-3" />
           Flow
         </button>
+        </div>
       </div>
 
-      {/* Node popup — rendered outside the zoom wrapper so it doesn't scale; hidden in link mode */}
-      {selectedNode && popupAnchor && !linkModeSourceId && (
+      {/* Node popup — rendered outside the zoom wrapper so it doesn't scale; hidden in link mode and in simulation mode */}
+      {selectedNode && popupAnchor && !linkModeSourceId && !simulationMode && (
         <NodePopup
           node={selectedNode}
           connectedFlows={connectedFlows}
@@ -958,6 +1059,7 @@ export function ThreeGraph({
           containerWidth={size.w}
           containerHeight={size.h}
           onUpdateValue={onUpdateNodeValue}
+          onEnterSimulation={onEnterSimulation}
           onStemNode={
             onRequestStemNode && selectedId
               ? () => {
@@ -974,6 +1076,122 @@ export function ThreeGraph({
           }
         />
       )}
+
+      {/* Simulation overlay — full-screen overlay with centered number input */}
+      {simulationMode && simulationNodeId && onSimulationChange && (() => {
+        const simNode = nodes.find((n) => n.id === simulationNodeId);
+        const simNodeLabel = nodeMap.get(simulationNodeId)?.label ?? simulationNodeId;
+        const storeVal = simNode?.amount ?? 0;
+        const displayStr = simInputFocused ? simInputValue : String(storeVal);
+        return (
+          <div
+            data-simulate-overlay
+            className="absolute inset-0 z-[60] flex items-center justify-center"
+            style={{ fontFamily: "'Manrope', sans-serif" }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) (e.currentTarget.querySelector('input') as HTMLInputElement)?.focus();
+            }}
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              style={{ zIndex: 0 }}
+              aria-hidden
+            />
+            {/* Centered panel */}
+            <div
+              className="relative z-10 w-full max-w-[280px] rounded-2xl px-4 py-4 shadow-2xl"
+              style={{
+                background: "rgba(8,8,15,0.97)",
+                border: "1px solid rgba(127,127,250,0.35)",
+                boxShadow: "0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(127,127,250,0.2)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#7F7FFA" }}>
+                  Simulate
+                </div>
+                {onSimulationDiscard && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSimulationDiscard(); }}
+                    className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition"
+                    style={{
+                      fontFamily: "'Manrope', sans-serif",
+                      background: "rgba(248,113,113,0.15)",
+                      border: "1px solid rgba(248,113,113,0.4)",
+                      color: "#f87171",
+                    }}
+                  >
+                    End simulation
+                  </button>
+                )}
+              </div>
+              <div className="text-[13px] text-[#9a9abe] mb-3">
+                {simNodeLabel}
+              </div>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={displayStr}
+                onFocus={() => setSimInputFocused(true)}
+                onBlur={() => {
+                  setSimInputFocused(false);
+                  const v = parseFloat(simInputValue);
+                  if (Number.isFinite(v) && v >= 0) {
+                    onSimulationChange(simulationNodeId, v);
+                  } else {
+                    setSimInputValue(String(storeVal));
+                  }
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9.]/g, "");
+                  setSimInputValue(raw);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const v = parseFloat(simInputValue);
+                    if (Number.isFinite(v) && v >= 0) {
+                      onSimulationChange(simulationNodeId, v);
+                    }
+                    setSimInputFocused(false);
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                placeholder="Enter amount"
+                className="w-full rounded-lg outline-none text-[15px] font-semibold"
+                style={{
+                  background: "#050508",
+                  border: "1px solid rgba(127,127,250,0.4)",
+                  color: "#e8e8ff",
+                  padding: "10px 12px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+                autoComplete="off"
+              />
+              <div className="text-[11px] mt-2" style={{ color: "#9a9abe" }}>
+                Type new value — graph updates after you pause. Click Apply to run Simulator.
+              </div>
+              {onSimulationApply && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onSimulationApply(); }}
+                  className="mt-2 w-full rounded-lg py-2 font-semibold text-[13px] transition"
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    background: "#00ff88",
+                    color: "#050508",
+                  }}
+                >
+                  Apply to Ecosystem
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

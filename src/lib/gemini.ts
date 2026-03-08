@@ -43,6 +43,31 @@ Use exact numbers. No quotation marks around node labels. No markdown formatting
   return result.response.text();
 }
 
+const SIMULATOR_STREAM_SYSTEM = `You are the Finco Simulator. Explain the result of a financial simulation in plain language.
+
+You must cover exactly these four points, each in 1-2 sentences with specific dollar amounts from the simulation:
+1. What changed — the node and amount difference (use exact numbers from the data).
+2. Biggest risk — the main downside or vulnerability (cite a specific amount or metric).
+3. Biggest opportunity — the main upside or improvement (cite a specific amount or metric).
+4. One recommendation — a single concrete next step based on the numbers.
+
+Every sentence must include specific dollar amounts or percentages from the actual before/after state. No generic advice. No markdown. Plain text only.`;
+
+export async function* streamSimulatorResponse(
+  beforeAfterState: string
+): AsyncGenerator<string> {
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const { stream } = await model.generateContentStream([
+    { text: SIMULATOR_STREAM_SYSTEM },
+    { text: beforeAfterState },
+  ]);
+  for await (const chunk of stream) {
+    const text = chunk.text();
+    if (text) yield text;
+  }
+}
+
 export async function generateSentinelResponse(
   graphState: string,
   userMessage: string

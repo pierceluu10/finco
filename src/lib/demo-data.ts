@@ -34,14 +34,11 @@ export const demoNodes: (Omit<FinancialNode, "id" | "user_id"> & { _id: string }
 
   // Housing cluster
   { _id: "mortgage", label: "Mortgage", type: "debt", current_value: 387000, monthly_weight: 2200, metadata_json: { rate: 5.14, remaining_years: 22 } },
-  { _id: "property-tax", label: "Property Tax", type: "expense", current_value: 0, monthly_weight: 340, metadata_json: { annual: 4080 } },
-  { _id: "home-insurance", label: "Home Insurance", type: "expense", current_value: 0, monthly_weight: 95, metadata_json: { provider: "Intact" } },
   { _id: "home-maintenance", label: "Home Maintenance", type: "expense", current_value: 0, monthly_weight: 150, metadata_json: {} },
 
   // Daily living cluster
   { _id: "groceries", label: "Groceries", type: "expense", current_value: 0, monthly_weight: 600, metadata_json: { category: "food" } },
   { _id: "dining", label: "Dining & Takeout", type: "expense", current_value: 0, monthly_weight: 280, metadata_json: {} },
-  { _id: "coffee", label: "Coffee", type: "expense", current_value: 0, monthly_weight: 65, metadata_json: { avg_per_visit: 5.5 } },
 
   // Bills & recurring cluster
   { _id: "utilities", label: "Utilities", type: "expense", current_value: 0, monthly_weight: 180, metadata_json: {} },
@@ -88,8 +85,6 @@ export const demoEdges: { source: string; target: string; amount: number; freque
 
   // Joint account → housing cluster
   { source: "joint-account", target: "mortgage", amount: 2200, frequency: "monthly" },
-  { source: "joint-account", target: "property-tax", amount: 340, frequency: "monthly" },
-  { source: "joint-account", target: "home-insurance", amount: 95, frequency: "monthly" },
   { source: "joint-account", target: "home-maintenance", amount: 150, frequency: "monthly" },
   { source: "joint-account", target: "utilities", amount: 180, frequency: "monthly" },
 
@@ -98,7 +93,6 @@ export const demoEdges: { source: string; target: string; amount: number; freque
   { source: "utilities", target: "internet", amount: 80, frequency: "monthly" },
 
   // Credit card → small daily expenses
-  { source: "credit-card", target: "coffee", amount: 65, frequency: "monthly" },
   { source: "credit-card", target: "parking", amount: 60, frequency: "monthly" },
 
   // Chequing → savings
@@ -165,7 +159,7 @@ export const demoAlerts: Omit<Alert, "id" | "user_id" | "created_at">[] = [
 
 export function getDemoFinancialSummary() {
   const monthlyIncome = 8500 + 1200 + 180;
-  const monthlyExpenses = 2200 + 340 + 95 + 150 + 600 + 280 + 65 + 180 + 92 + 450 + 140 + 135 + 60 + 55 + 45;
+  const monthlyExpenses = 2200 + 150 + 600 + 280 + 180 + 92 + 450 + 140 + 135 + 60 + 55 + 45;
   const monthlySavings = 300 + 200 + 150;
   const monthlyInvestments = 500 + 400;
   const monthlySurplus = monthlyIncome - monthlyExpenses - monthlySavings - monthlyInvestments;

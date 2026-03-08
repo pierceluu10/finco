@@ -19,6 +19,8 @@ interface NodePopupProps {
   onStemNode?: () => void;
   onLinkNode?: () => void;
   onDeleteNode?: () => void;
+  /** Enter simulation mode for this node (closes popup and shows slider on graph) */
+  onEnterSimulation?: (nodeId: string) => void;
 }
 
 function serializeNodeContext(
@@ -50,13 +52,14 @@ export function NodePopup({
   nodeMap,
   onClose,
   anchorX,
-  anchorY,
+  anchorY: _anchorY,
   containerWidth,
   containerHeight,
   onUpdateValue,
   onStemNode,
   onLinkNode,
   onDeleteNode,
+  onEnterSimulation,
 }: NodePopupProps) {
   const [visible, setVisible] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -173,8 +176,9 @@ export function NodePopup({
     <div
       ref={popupRef}
       data-node-popup
-      className="absolute z-50 font-sans"
+      className="absolute z-50"
       style={{
+        fontFamily: "'Manrope', sans-serif",
         left: x,
         top: y,
         width: popW,
@@ -208,11 +212,11 @@ export function NodePopup({
             <X className="h-3.5 w-3.5" />
           </button>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="font-sans font-bold text-[18px]" style={{ color: "#e8e8ff" }}>
+            <span className="font-bold text-[18px]" style={{ color: "#e8e8ff" }}>
               {node.label}
             </span>
             <span
-              className="font-sans rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
               style={{ backgroundColor: `${color}26`, color }}
             >
               {node.type}
@@ -250,7 +254,7 @@ export function NodePopup({
             >
               {formatCurrency(primaryValue)}
               {showPerMo && (
-                <span className="font-sans text-[13px] font-medium" style={{ color: "#6b6b9a" }}>/mo</span>
+            <span className="font-medium text-[13px]" style={{ color: "#6b6b9a" }}>/mo</span>
               )}
             </span>
           )}
@@ -262,11 +266,11 @@ export function NodePopup({
         <div ref={scrollBodyRef} className="flex-1 min-h-0 overflow-y-auto">
         {/* Flows */}
         <div className="px-4 py-3">
-          <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
+          <p className="font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Flows
           </p>
           {inbound.length === 0 && outbound.length === 0 && (
-            <p className="font-sans text-[12px]" style={{ color: "#6b6b9a" }}>
+            <p className="text-[12px]" style={{ color: "#6b6b9a" }}>
               No connected flows
             </p>
           )}
@@ -275,7 +279,7 @@ export function NodePopup({
               <div key={f.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-[12px]" style={{ color: "#4ade80" }}>↓</span>
-                  <span className="font-sans truncate text-[12px]" style={{ color: "#9a9abe" }}>
+                  <span className="truncate text-[12px]" style={{ color: "#9a9abe" }}>
                     {nodeMap.get(f.source)?.label ?? f.source}
                   </span>
                 </div>
@@ -283,7 +287,7 @@ export function NodePopup({
                   <span className="text-[13px]" style={{ color: "#4ade80", fontFamily: "'Manrope', sans-serif" }}>
                     {formatCurrency(f.amount)}
                   </span>
-                  <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
+                  <span className="text-[10px]" style={{ color: "#6b6b9a" }}>
                     /{f.frequency === "monthly" ? "mo" : f.frequency}
                   </span>
                 </div>
@@ -293,7 +297,7 @@ export function NodePopup({
               <div key={f.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-[12px]" style={{ color: "#f87171" }}>↑</span>
-                  <span className="font-sans truncate text-[12px]" style={{ color: "#9a9abe" }}>
+                  <span className="truncate text-[12px]" style={{ color: "#9a9abe" }}>
                     {nodeMap.get(f.target)?.label ?? f.target}
                   </span>
                 </div>
@@ -301,7 +305,7 @@ export function NodePopup({
                   <span className="text-[13px]" style={{ color: "#f87171", fontFamily: "'Manrope', sans-serif" }}>
                     {formatCurrency(f.amount)}
                   </span>
-                  <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
+                  <span className="text-[10px]" style={{ color: "#6b6b9a" }}>
                     /{f.frequency === "monthly" ? "mo" : f.frequency}
                   </span>
                 </div>
@@ -316,7 +320,7 @@ export function NodePopup({
             <button
               type="button"
               onClick={onStemNode}
-              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              className="w-full font-semibold text-[13px] transition rounded-lg py-2.5"
               style={{
                 background: "transparent",
                 border: "1px solid rgba(127,127,250,0.2)",
@@ -336,7 +340,7 @@ export function NodePopup({
             <button
               type="button"
               onClick={onLinkNode}
-              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              className="w-full font-semibold text-[13px] transition rounded-lg py-2.5"
               style={{
                 background: "transparent",
                 border: "1px solid rgba(0,255,136,0.2)",
@@ -359,7 +363,7 @@ export function NodePopup({
                 onDeleteNode();
                 onClose();
               }}
-              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              className="w-full font-semibold text-[13px] transition rounded-lg py-2.5"
               style={{
                 background: "transparent",
                 border: "1px solid rgba(248,113,113,0.3)",
@@ -388,11 +392,11 @@ export function NodePopup({
                 const isNumeric = /^[\d.,]+%?$/.test(strVal);
                 return (
                   <div key={key} className="flex justify-between items-baseline gap-2">
-                    <span className="font-sans font-medium capitalize text-[12px]" style={{ color: "#6b6b9a" }}>
+                    <span className="font-medium capitalize text-[12px]" style={{ color: "#6b6b9a" }}>
                       {key.replace(/_/g, " ")}
                     </span>
                     <span
-                      className={`${isNumeric ? "tabular-nums" : ""} text-right truncate max-w-[140px] text-[12px] font-sans`}
+                      className={`${isNumeric ? "tabular-nums" : ""} text-right truncate max-w-[140px] text-[12px]`}
                       style={{ color: "#e8e8ff" }}
                     >
                       {strVal}
@@ -407,13 +411,13 @@ export function NodePopup({
 
         {/* Agent Chat */}
         <div className="px-4 py-3">
-          <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
+          <p className="font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Ask Sentinel
           </p>
 
           {chatResponse && (
             <div
-              className="font-sans rounded-lg px-3 py-2.5 mb-2 text-[13px] font-medium leading-relaxed"
+              className="rounded-lg px-3 py-2.5 mb-2 text-[13px] font-medium leading-relaxed"
               style={{ background: "#07070e", color: "#c8c8e8" }}
             >
               {chatResponse}
@@ -423,7 +427,7 @@ export function NodePopup({
           {chatLoading && (
             <div className="flex items-center gap-2 mb-2 px-1">
               <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#7F7FFA" }} />
-              <span className="font-sans text-[11px]" style={{ color: "#6b6b9a" }}>Thinking...</span>
+              <span className="text-[11px]" style={{ color: "#6b6b9a" }}>Thinking...</span>
             </div>
           )}
 
@@ -435,7 +439,7 @@ export function NodePopup({
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
               placeholder="Ask something about this node..."
-              className="font-sans flex-1 text-[13px] outline-none"
+              className="flex-1 text-[13px] outline-none"
               style={{
                 background: "#050508",
                 border: "1px solid #1a1a2e",
@@ -456,6 +460,30 @@ export function NodePopup({
             </button>
             </div>
           </div>
+
+          {onEnterSimulation && (
+            <button
+              type="button"
+              onClick={() => {
+                onEnterSimulation(node.id);
+                onClose();
+              }}
+              className="w-full font-semibold text-[13px] rounded-lg py-2.5 mt-2 transition"
+              style={{
+                background: "rgba(127,127,250,0.15)",
+                border: "1px solid rgba(127,127,250,0.4)",
+                color: "#7AAFDA",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(127,127,250,0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(127,127,250,0.15)";
+              }}
+            >
+              Simulator
+            </button>
+          )}
         </div>
       </div>
     </div>
