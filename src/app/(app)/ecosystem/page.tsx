@@ -296,11 +296,12 @@ function EcosystemDashboard() {
           />
 
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 origin-center"
             style={{
               zIndex: 1,
               opacity: graphIn ? 1 : 0,
-              transition: "opacity 200ms ease",
+              transform: graphIn ? "scale(1)" : "scale(0.65)",
+              transition: "opacity 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 700ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
             }}
           >
             <ThreeGraph

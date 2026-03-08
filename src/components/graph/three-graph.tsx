@@ -131,6 +131,7 @@ export function ThreeGraph({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [flowView, setFlowView] = useState(false);
   const [size, setSize] = useState({ w: 1000, h: 700 });
+  const [isDragging, setIsDragging] = useState(false);
 
   // Drag state refs (not React state to avoid re-renders per frame)
   const draggingRef = useRef<string | null>(null);
@@ -315,6 +316,7 @@ export function ThreeGraph({
       const sn = simNodesRef.current.find((s) => s.id === nodeId);
       if (!sn) return;
       draggingRef.current = nodeId;
+      setIsDragging(true);
       const rect = containerRef.current!.getBoundingClientRect();
       const sim = screenToSim(e.clientX - rect.left, e.clientY - rect.top);
       dragOffsetRef.current = {
@@ -358,6 +360,7 @@ export function ThreeGraph({
         sn.fy = undefined;
       }
       draggingRef.current = null;
+      setIsDragging(false);
     };
 
     window.addEventListener("mousemove", handleMove);
@@ -402,16 +405,23 @@ export function ThreeGraph({
       particlesRef.current = [];
       return;
     }
-    // Initialize particles for each flow
+    const amounts = financialFlows.map((f) => Math.max(0, f.amount));
+    const maxAmount = Math.max(...amounts, 1);
+    const minSpeed = 0.0008;
+    const maxSpeed = 0.005;
+
     const particles: Particle[] = [];
     for (const flow of financialFlows) {
       const srcNode = financialNodes.find((n) => n.id === flow.source);
       const isIncome = srcNode?.type === "income";
+      const amount = Math.max(0, flow.amount);
+      const t = amount <= 0 ? 0.5 : Math.min(1, amount / maxAmount);
+      const speed = minSpeed + t * (maxSpeed - minSpeed);
       for (let i = 0; i < 3; i++) {
         particles.push({
           flowId: flow.id,
           t: i / 3,
-          speed: 0.002 + Math.random() * 0.001,
+          speed: speed * (0.95 + Math.random() * 0.1),
           isIncome,
         });
       }
@@ -419,13 +429,15 @@ export function ThreeGraph({
     particlesRef.current = particles;
   }, [flowView, financialFlows, financialNodes]);
 
-  // Canvas particle rendering (particles move along the lines)
+  // Canvas particle rendering: only on focused node's links when Flow is on
   useEffect(() => {
     if (!flowView) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const activeId = selectedId ?? hoveredId;
 
     let particleRaf: number;
     const drawParticles = () => {
@@ -436,6 +448,9 @@ export function ThreeGraph({
       for (const p of particlesRef.current) {
         const flow = financialFlows.find((f) => f.id === p.flowId);
         if (!flow) continue;
+        // When a node is focused, only show particles on its connected links; otherwise show all
+        if (activeId && flow.source !== activeId && flow.target !== activeId) continue;
+
         const src = posMap.get(flow.source);
         const tgt = posMap.get(flow.target);
         if (!src || !tgt) continue;
@@ -491,7 +506,7 @@ export function ThreeGraph({
 
     particleRaf = requestAnimationFrame(drawParticles);
     return () => cancelAnimationFrame(particleRaf);
-  }, [flowView, financialFlows, posMap, size.w, size.h]);
+  }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
 
   // Compute zoom transform
   const zoomTransform = useMemo(() => {
@@ -610,7 +625,7 @@ export function ThreeGraph({
                 }
                 strokeWidth={isConnectedToSelected ? 2.8 : isActive ? 2.2 : 1.4}
                 style={{
-                  transition: "all 200ms ease",
+                  transition: isDragging ? "none" : "all 200ms ease",
                   opacity: dimmed ? 0.12 : 1,
                 }}
               />

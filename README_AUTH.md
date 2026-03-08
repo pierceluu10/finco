@@ -6,6 +6,17 @@ Finco uses **Auth0** (Regular Web Application type) for authentication via the
 `@auth0/nextjs-auth0` v4 SDK. Authentication uses **Auth0 Universal Login** —
 no embedded credential forms.
 
+## “Dev Keys” warning
+
+If you see: **“One or more of your connections are currently using Auth0 development keys and should not be used in production”**:
+
+- **Local / development:** This is expected when using a domain like `dev-*.us.auth0.com` or an Auth0 application marked as “Development”. Safe to ignore for localhost and non‑production use.
+- **Production:** Do not use dev keys in production. In the [Auth0 Dashboard](https://manage.auth0.com/):
+  1. Create a **Production** application (or use a production tenant), and  
+  2. Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` in your production environment to that application’s values.
+
+[Auth0 docs: Development vs Production keys](https://auth0.com/docs/get-started/applications/application-types#development-and-production-applications)
+
 ## Environment Variables
 
 Add these to `.env.local`:
