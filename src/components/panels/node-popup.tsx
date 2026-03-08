@@ -117,14 +117,24 @@ export function NodePopup({
     return () => clearTimeout(timer);
   }, []);
 
+  // Focus Sentinel chat input when overlay is visible so users can type immediately
+  useEffect(() => {
+    if (!visible || editingValue) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, [visible, editingValue]);
+
   const popW = 300;
   const popH = 400;
+  const padding = 16;
+  const maxPopH = Math.min(popH, containerHeight - padding * 2);
+  // Prefer right of node; flip to left if no room
   let x = anchorX + 20;
-  let y = anchorY - popH / 2;
-  if (x + popW > containerWidth - 12) x = anchorX - popW - 20;
-  if (y < 12) y = 12;
-  if (y + popH > containerHeight - 12) y = containerHeight - popH - 12;
-  if (x < 12) x = 12;
+  if (x + popW > containerWidth - padding) x = anchorX - popW - 20;
+  // Clamp so overlay never goes off-screen
+  x = Math.max(padding, Math.min(containerWidth - popW - padding, x));
+  let y = anchorY - maxPopH / 2;
+  y = Math.max(padding, Math.min(containerHeight - maxPopH - padding, y));
 
   const sendChat = useCallback(async () => {
     const msg = chatInput.trim();
@@ -152,11 +162,13 @@ export function NodePopup({
   return (
     <div
       ref={popupRef}
+      data-node-popup
       className="absolute z-50 font-sans"
       style={{
         left: x,
         top: y,
         width: popW,
+        maxHeight: maxPopH,
         opacity: visible ? 1 : 0,
         transform: visible ? "scale(1)" : "scale(0.95)",
         transition: "opacity 0.25s ease, transform 0.25s ease",
@@ -165,6 +177,7 @@ export function NodePopup({
       onClick={(e) => e.stopPropagation()}
     >
       <div
+        className="flex flex-col h-full"
         style={{
           background: "#0a0a14",
           border: "1px solid rgba(127, 127, 250, 0.25)",
@@ -172,10 +185,11 @@ export function NodePopup({
           borderRadius: 14,
           boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
           overflow: "hidden",
+          maxHeight: maxPopH,
         }}
       >
         {/* Header */}
-        <div className="px-4 pt-4 pb-3 relative">
+        <div className="px-4 pt-4 pb-3 relative flex-shrink-0">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1 rounded-md transition hover:text-[#e8e8ff]"
@@ -234,6 +248,8 @@ export function NodePopup({
 
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
+        {/* Scrollable body so overlay stays in view when container is short */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Flows */}
         <div className="px-4 py-3">
           <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
@@ -428,6 +444,7 @@ export function NodePopup({
             >
               <Send className="h-3.5 w-3.5" />
             </button>
+            </div>
           </div>
         </div>
       </div>

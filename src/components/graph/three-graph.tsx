@@ -352,6 +352,39 @@ export function ThreeGraph({
     return m;
   }, [nodes]);
 
+  // Fit all nodes in view (on load and when nodes/size change); no zoom in/out — graph stays within bounds
+  const FIT_PADDING = 48;
+  const fitView = useCallback(() => {
+    if (nodes.length === 0 || size.w <= 0 || size.h <= 0) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const n of nodes) {
+      const r = n.radius ?? 28;
+      minX = Math.min(minX, n.x - r);
+      maxX = Math.max(maxX, n.x + r);
+      minY = Math.min(minY, n.y - r);
+      maxY = Math.max(maxY, n.y + r);
+    }
+    const contentW = maxX - minX + FIT_PADDING * 2;
+    const contentH = maxY - minY + FIT_PADDING * 2;
+    const scale = Math.min(size.w / contentW, size.h / contentH, 1);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const tx = size.w / 2 - centerX * scale;
+    const ty = size.h / 2 - centerY * scale;
+    const next = { tx, ty, scale };
+    cameraRef.current = next;
+    setCamera(next);
+    setSmoothCamera(true);
+  }, [nodes, size.w, size.h]);
+
+  useEffect(() => {
+    if (nodes.length === 0 || size.w <= 0 || size.h <= 0) return;
+    fitView();
+  }, [nodes, size.w, size.h, fitView]);
+
   // Notify parent of current graph snapshot (for simulation overlay)
   useEffect(() => {
     if (!onGraphSnapshot || nodes.length === 0) return;
@@ -459,7 +492,10 @@ export function ThreeGraph({
     };
   }, [screenToSim]);
 
-  // ── Click to zoom ──
+  // Zoom-in scale when a node is selected so the overlay is prominently in view
+  const ZOOM_TO_NODE_SCALE = 2;
+
+  // ── Click to select node (zoom in and center on node so overlay is in view) ──
   const handleNodeClick = useCallback(
     (nodeId: string) => {
       if (didDragRef.current) return;
@@ -469,21 +505,17 @@ export function ThreeGraph({
       }
       if (selectedId === nodeId) {
         setSelectedId(null);
-        const reset = { tx: 0, ty: 0, scale: 1 };
-        cameraRef.current = reset;
-        setCamera(reset);
-        setSmoothCamera(true);
+        fitView();
         onDeselectNode();
         return;
       }
       const pos = posMap.get(nodeId);
       if (pos) {
         setSelectedId(nodeId);
-        const scale = 1.5;
         const next = {
-          tx: size.w / 2 - pos.x * scale,
-          ty: size.h / 2 - pos.y * scale,
-          scale,
+          tx: size.w / 2 - pos.x * ZOOM_TO_NODE_SCALE,
+          ty: size.h / 2 - pos.y * ZOOM_TO_NODE_SCALE,
+          scale: ZOOM_TO_NODE_SCALE,
         };
         cameraRef.current = next;
         setCamera(next);
@@ -491,7 +523,7 @@ export function ThreeGraph({
         onSelectNode(nodeId);
       }
     },
-    [selectedId, linkModeSourceId, onLinkTargetSelected, posMap, onSelectNode, onDeselectNode, size.w, size.h]
+    [selectedId, linkModeSourceId, onLinkTargetSelected, posMap, onSelectNode, onDeselectNode, size.w, size.h, fitView]
   );
 
   const handleCanvasClick = useCallback(() => {
@@ -501,13 +533,10 @@ export function ThreeGraph({
     }
     if (selectedId) {
       setSelectedId(null);
-      const reset = { tx: 0, ty: 0, scale: 1 };
-      cameraRef.current = reset;
-      setCamera(reset);
-      setSmoothCamera(true);
+      fitView();
       onDeselectNode();
     }
-  }, [selectedId, onDeselectNode]);
+  }, [selectedId, onDeselectNode, fitView]);
 
   useEffect(() => {
     if (!linkModeSourceId) return;
@@ -627,33 +656,6 @@ export function ThreeGraph({
     return () => cancelAnimationFrame(particleRaf);
   }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
 
-  // Wheel zoom handler
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const dir = e.deltaY > 0 ? -1 : 1;
-      const factor = 1 + dir * 0.08;
-      const c = cameraRef.current;
-      const newScale = Math.min(Math.max(c.scale * factor, 0.2), 5);
-      const ratio = newScale / c.scale;
-      const next = {
-        tx: mx - ratio * (mx - c.tx),
-        ty: my - ratio * (my - c.ty),
-        scale: newScale,
-      };
-      cameraRef.current = next;
-      setCamera(next);
-      setSmoothCamera(false);
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
-
   // Selected node data for popup
   const selectedNode = useMemo(() => {
     if (!selectedId) return null;
@@ -674,11 +676,11 @@ export function ThreeGraph({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full"
+      className="relative w-full h-full min-h-0 overflow-hidden"
       onClick={handleCanvasClick}
       onMouseDown={(e) => {
         const t = e.target as HTMLElement;
-        if (t.closest("button") || t.closest("[data-node-id]")) return;
+        if (t.closest("button") || t.closest("[data-node-id]") || t.closest("[data-node-popup]")) return;
         e.preventDefault();
         isPanningRef.current = true;
         didPanRef.current = false;
@@ -704,7 +706,11 @@ export function ThreeGraph({
         </div>
       )}
 
-      {/* Static: background glow (vector + gradient) — no animation */}
+      {/* Static: background glow (vector + gradient) — no animation; matches layout so no void when zooming */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 0, background: "hsl(240 10% 3.9%)" }}
+      />
       <Image
         src="/images/Vector.png"
         alt=""
@@ -723,10 +729,9 @@ export function ThreeGraph({
 
       {/* Only the node graph (zoom wrapper + edges + nodes) animates */}
       <div
-        className="absolute inset-0 origin-center"
+        className="absolute inset-0 origin-center overflow-hidden"
         style={{
           zIndex: 1,
-          overflow: "visible",
           opacity: graphIntroDone ? 1 : 0,
           transform: graphIntroDone ? "scale(1)" : "scale(0.65)",
           transition: "opacity 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 700ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
@@ -783,15 +788,16 @@ export function ThreeGraph({
                 fill="none"
                 stroke={
                   isConnectedToSelected
-                    ? "rgba(127,127,250,0.95)"
+                    ? "rgba(127,127,250,1)"
                     : isActive
                       ? "rgba(127,127,250,0.6)"
                       : "rgba(127,127,250,0.35)"
                 }
-                strokeWidth={isConnectedToSelected ? 2.8 : isActive ? 2.2 : 1.4}
+                strokeWidth={isConnectedToSelected ? 3.5 : isActive ? 2.2 : 1.4}
                 style={{
                   transition: isDragging ? "none" : "all 200ms ease",
-                  opacity: dimmed ? 0.12 : 1,
+                  opacity: dimmed ? 0.08 : 1,
+                  filter: isConnectedToSelected ? "drop-shadow(0 0 6px rgba(127,127,250,0.6))" : undefined,
                 }}
               />
             );
@@ -940,10 +946,7 @@ export function ThreeGraph({
           nodeMap={nodeMap}
           onClose={() => {
             setSelectedId(null);
-            const reset = { tx: 0, ty: 0, scale: 1 };
-            cameraRef.current = reset;
-            setCamera(reset);
-            setSmoothCamera(true);
+            fitView();
             onDeselectNode();
           }}
           anchorX={popupAnchor.x}

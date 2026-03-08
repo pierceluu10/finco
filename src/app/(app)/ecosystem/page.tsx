@@ -492,7 +492,7 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
           introContentOpacity={sidebarContentOverride}
         />
 
-        <div className="relative h-full overflow-visible">
+        <div className="relative h-full min-h-0 overflow-hidden">
           {/* Background and vector: no animation, always visible when content is shown */}
           <Image
             src="/images/Vector.png"
