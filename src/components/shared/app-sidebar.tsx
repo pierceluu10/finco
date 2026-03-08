@@ -175,9 +175,9 @@ export function AppSidebar({
   collapsed = false,
   onToggleCollapse,
   onOpenAgentChat,
-  onAddNodeDirect,
-  onCsvImportDirect,
-  onParsedCsvMerge,
+  onAddNodeDirect: _onAddNodeDirect,
+  onCsvImportDirect: _onCsvImportDirect,
+  onParsedCsvMerge: _onParsedCsvMerge,
   introStyle,
   introContentOpacity,
 }: SidebarProps) {
@@ -887,7 +887,7 @@ export function FinancialsContent({
             className="font-sans"
             style={{ fontWeight: 500, fontSize: 11, color: "#3a3a5a" }}
           >
-            The file can be anything — bank export, spreadsheet, or transaction list. We'll detect the format and pull in what we can.
+            The file can be anything — bank export, spreadsheet, or transaction list. We&apos;ll detect the format and pull in what we can.
           </p>
         </div>
         )}
