@@ -2,7 +2,11 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
+<<<<<<< Updated upstream
 import { User, LogOut, ArrowUp } from "lucide-react";
+=======
+import { User, LogOut, Upload as UploadIcon, ArrowUp, PanelLeftClose, PanelRightOpen } from "lucide-react";
+>>>>>>> Stashed changes
 import { FincoLogo } from "./logo";
 import { formatCurrency } from "@/lib/utils";
 import type {
@@ -188,6 +192,7 @@ export function AppSidebar({
   const outerStyle: React.CSSProperties = {
     width: collapsed ? 0 : "25vw",
     transition: `width ${TRANSITION}`,
+    overflow: collapsed ? "visible" : "hidden",
     ...introStyle,
   };
 
@@ -208,20 +213,40 @@ export function AppSidebar({
       className="fixed left-0 top-0 z-40 h-screen"
       style={outerStyle}
     >
-      {/* Inner panel (clips content) */}
+      {/* Inner panel — overflow hidden so when sidebar width is 0, panel doesn't paint over graph */}
       <div
         className="h-full flex flex-col border-r border-white/5 bg-zinc-950"
         style={{
           overflow: "hidden",
+          width: "100%",
+          minWidth: 0,
           opacity: innerOpacity,
           transition: innerTransition,
         }}
       >
-        {/* Logo */}
-        <div className="flex h-14 shrink-0 items-center px-4 border-b border-white/5">
+        {/* Logo + Minimize (always visible when expanded so user can collapse; expand tab when collapsed never disappears) */}
+        <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4 border-b border-white/5">
           <Link href="/">
             <FincoLogo size="sm" />
           </Link>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-sans text-xs font-medium transition-colors hover:bg-white/5"
+              style={{ color: "#6b6b9a" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#e8e8ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "#6b6b9a";
+              }}
+              aria-label="Minimize dashboard"
+            >
+              <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Minimize</span>
+            </button>
+          )}
         </div>
 
         {/* Tab bar */}
@@ -310,34 +335,63 @@ export function AppSidebar({
         </div>
       </div>
 
-      {/* Collapse/expand toggle button */}
-      <button
-        onClick={onToggleCollapse}
-        className="absolute transition-colors duration-200"
-        style={{
-          right: -24,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 24,
-          height: 48,
-          background: "#0a0a14",
-          border: "1px solid #1a1a2e",
-          borderLeft: "none",
-          borderRadius: "0 8px 8px 0",
-          color: "#6b6b9a",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-          lineHeight: 1,
-          cursor: "pointer",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b9a")}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? "›" : "‹"}
-      </button>
+      {/* Expand/collapse toggle — when collapsed: always visible tab with "Expand"; when expanded: tab on right edge */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="absolute transition-all duration-200 flex items-center gap-1.5"
+          style={{
+            ...(collapsed
+              ? {
+                  left: 0,
+                  right: "auto",
+                  borderRadius: "0 8px 8px 0",
+                  borderLeft: "1px solid #1a1a2e",
+                  paddingLeft: 6,
+                  paddingRight: 8,
+                }
+              : {
+                  right: -24,
+                  left: "auto",
+                  borderRadius: "0 8px 8px 0",
+                  borderLeft: "none",
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                }),
+            top: "50%",
+            transform: "translateY(-50%)",
+            minWidth: collapsed ? 80 : 24,
+            width: collapsed ? "auto" : 24,
+            height: 48,
+            background: "#0a0a14",
+            border: "1px solid #1a1a2e",
+            color: "#6b6b9a",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: collapsed ? 12 : 16,
+            lineHeight: 1,
+            cursor: "pointer",
+            zIndex: 50,
+            pointerEvents: "auto",
+            fontFamily: "var(--font-sans), sans-serif",
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b9a")}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <>
+              <PanelRightOpen className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">Expand</span>
+            </>
+          ) : (
+            "‹"
+          )}
+        </button>
+      )}
     </div>
   );
 }

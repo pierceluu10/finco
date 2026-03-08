@@ -15,6 +15,8 @@ import { AddNodeDialog } from "@/components/panels/add-node-dialog";
 import { DeleteConfirmDialog } from "@/components/panels/delete-confirm-dialog";
 import { CsvUploadDialog } from "@/components/panels/csv-upload-dialog";
 import { AgentChatModal } from "@/components/panels/agent-chat-modal";
+import { SimulationOverlay } from "@/components/panels/simulation-overlay";
+import type { GraphSnapshotNode } from "@/components/graph/three-graph";
 import type {
   DialogMode,
   FinancialNodeData,
@@ -28,7 +30,6 @@ import type {
 
 type AgentType = "sentinel" | "simulator" | "planner";
 
-const STORAGE_KEY = "finco-sidebar-collapsed";
 const ONBOARDING_STORAGE_KEY = "finco-onboarding-data";
 const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
 const SIDEBAR_SLIDE = "500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
@@ -56,22 +57,11 @@ function EcosystemDashboard() {
     }
   }, [graph]);
 
-  // ── Sidebar collapse (persisted) ──
+  // ── Sidebar collapse (session only; always expanded on refresh) ──
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "true") setSidebarCollapsed(true);
-    } catch { /* noop */ }
-  }, []);
-
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* noop */ }
-      return next;
-    });
+    setSidebarCollapsed((prev) => !prev);
   }, []);
 
   // ── Entry sequence — always plays on mount, no sessionStorage ──
@@ -107,6 +97,13 @@ function EcosystemDashboard() {
   const [agentChatAgent, setAgentChatAgent] = useState<AgentType | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [simulationPayload, setSimulationPayload] = useState<{
+    responseText: string;
+    nodes: GraphSnapshotNode[];
+    flows: FinancialFlowData[];
+  } | null>(null);
+  const graphSnapshotRef = useRef<{ nodes: GraphSnapshotNode[]; flows: FinancialFlowData[] } | null>(null);
 
   const deletionImpact = useMemo(
     () => (deleteTarget ? graph.getDeletionImpact(deleteTarget) : null),
@@ -237,6 +234,35 @@ function EcosystemDashboard() {
     [graph]
   );
 
+  const handleGraphSnapshot = useCallback((nodes: GraphSnapshotNode[], flows: FinancialFlowData[]) => {
+    graphSnapshotRef.current = { nodes, flows };
+  }, []);
+
+  const handleSimulatorResponseComplete = useCallback((responseText: string) => {
+    const snap = graphSnapshotRef.current;
+    if (!snap || snap.nodes.length === 0) return;
+    setSimulationPayload({
+      responseText,
+      nodes: snap.nodes.map((n) => ({ ...n, metadata: { ...n.metadata } })),
+      flows: snap.flows.map((f) => ({ ...f })),
+    });
+    setSimulationOpen(true);
+  }, []);
+
+  const handleSimulationApply = useCallback(
+    (updates: Map<string, { currentValue?: number; monthlyFlow?: number }>) => {
+      updates.forEach((val, id) => {
+        graph.updateNode(id, val);
+      });
+      setSimulationOpen(false);
+      setSimulationPayload(null);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast("Simulation applied to your ecosystem");
+      toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+    },
+    [graph]
+  );
+
   // Sidebar intro styles
   const sidebarOuter: React.CSSProperties | undefined =
     !introDone
@@ -306,7 +332,7 @@ function EcosystemDashboard() {
           introContentOpacity={sidebarContentOverride}
         />
 
-        <div className="relative h-full overflow-hidden">
+        <div className="relative h-full overflow-visible">
           {/* Background and vector: no animation, always visible when content is shown */}
           <Image
             src="/images/Vector.png"
@@ -330,6 +356,7 @@ function EcosystemDashboard() {
             burstActive={burstActive}
             interactionEnabled={interactionEnabled}
             graphIntroDone={graphIn}
+            onGraphSnapshot={handleGraphSnapshot}
           />
 
           <div
@@ -382,7 +409,22 @@ function EcosystemDashboard() {
           financialFlows={graph.financialFlows}
           nodeMap={graph.nodeMap}
           selectedNodeId={graph.selectedNodeId ?? undefined}
+          onSimulatorResponseComplete={handleSimulatorResponseComplete}
         />
+
+        {simulationPayload && (
+          <SimulationOverlay
+            open={simulationOpen}
+            onClose={() => {
+              setSimulationOpen(false);
+              setSimulationPayload(null);
+            }}
+            responseText={simulationPayload.responseText}
+            nodes={simulationPayload.nodes}
+            flows={simulationPayload.flows}
+            onApply={handleSimulationApply}
+          />
+        )}
 
         {toast && (
           <div

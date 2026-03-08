@@ -21,6 +21,8 @@ interface AgentChatModalProps {
   financialFlows: FinancialFlowData[];
   nodeMap: Map<string, FinancialNodeData>;
   selectedNodeId?: string;
+  /** Called when Simulator agent finishes a response (streaming or JSON). Use to open simulation overlay. */
+  onSimulatorResponseComplete?: (responseText: string) => void;
 }
 
 const AGENT_META: Record<
@@ -93,6 +95,7 @@ export function AgentChatModal({
   financialFlows,
   nodeMap,
   selectedNodeId,
+  onSimulatorResponseComplete,
 }: AgentChatModalProps) {
   const meta = AGENT_META[agent] ?? AGENT_META.sentinel;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -174,12 +177,18 @@ export function AgentChatModal({
           { role: "assistant", content: accumulated, timestamp: new Date() },
         ]);
         setStreamingText("");
+        if (agent === "simulator" && accumulated.trim()) {
+          onSimulatorResponseComplete?.(accumulated);
+        }
       } else {
         const data = await res.json();
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: data.reply, timestamp: new Date() },
         ]);
+        if (agent === "simulator" && data.reply?.trim()) {
+          onSimulatorResponseComplete?.(data.reply);
+        }
       }
     } catch {
       setMessages((prev) => [
@@ -194,7 +203,7 @@ export function AgentChatModal({
       setLoading(false);
       setStreamingText("");
     }
-  }, [input, loading, financialNodes, financialFlows, nodeMap, agent, selectedNodeId]);
+  }, [input, loading, financialNodes, financialFlows, nodeMap, agent, selectedNodeId, onSimulatorResponseComplete]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

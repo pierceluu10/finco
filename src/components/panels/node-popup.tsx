@@ -83,7 +83,7 @@ export function NodePopup({
     try {
       const context = serializeNodeContext(node, connectedFlows, nodeMap);
       const graphState = `FOCUSED NODE CONTEXT\n${context}`;
-      const res = await fetch("/api/ai/librarian", {
+      const res = await fetch("/api/ai/sentinel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ graphState, message: msg }),

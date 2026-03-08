@@ -70,6 +70,15 @@ export interface ThreeGraphProps {
   interactionEnabled: boolean;
   /** When true, the node graph intro animation (scale/opacity) has finished; only the graph content animates. */
   graphIntroDone?: boolean;
+  /** Called when node positions/layout change; use to snapshot graph for simulation overlay. */
+  onGraphSnapshot?: (nodes: GraphSnapshotNode[], flows: FinancialFlowData[]) => void;
+}
+
+/** Node data + layout position for simulation overlay snapshot */
+export interface GraphSnapshotNode extends FinancialNodeData {
+  x: number;
+  y: number;
+  radius: number;
 }
 
 /* ── Helpers ── */
@@ -98,9 +107,18 @@ interface Particle {
 
 /* ── Constants ── */
 
-const NODE_PAD = 48; // spacing between nodes to minimize overlap
-const LAYOUT_RADIUS_X = 440; // wider horizontal spread (left–right)
-const LAYOUT_RADIUS_Y = 240; // slightly tighter vertically to use horizontal space
+const NODE_PAD = 48;
+const LAYOUT_RADIUS_X = 320;
+const LAYOUT_RADIUS_Y = 180;
+/** Fixed layout size so we don't re-run simulation on resize — keeps nodes and edges in sync */
+const LAYOUT_WIDTH = 800;
+const LAYOUT_HEIGHT = 600;
+/** ViewBox padding so curved edges (bulge up to 20) and peripheral nodes are never clipped by SVG */
+const SVG_VIEWBOX_PAD = 120;
+const SVG_VIEWBOX_X = -LAYOUT_RADIUS_X - SVG_VIEWBOX_PAD;
+const SVG_VIEWBOX_Y = -LAYOUT_RADIUS_Y - SVG_VIEWBOX_PAD;
+const SVG_VIEWBOX_W = LAYOUT_WIDTH + SVG_VIEWBOX_PAD * 2;
+const SVG_VIEWBOX_H = LAYOUT_HEIGHT + SVG_VIEWBOX_PAD * 2;
 
 /** Deterministic "random" from string seed — same layout every time */
 function seededPosition(id: string, index: number): { x: number; y: number } {
@@ -127,6 +145,7 @@ export function ThreeGraph({
   burstActive: _burstActive,
   interactionEnabled: _interactionEnabled,
   graphIntroDone = true,
+  onGraphSnapshot,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,13 +228,13 @@ export function ThreeGraph({
     return m;
   }, [financialNodes]);
 
-  // One-time layout: run force simulation to convergence, then stop (no ongoing animation)
+  // One-time layout: run force simulation in fixed coordinate space (do not depend on size — avoids desync when sidebar resizes)
   useEffect(() => {
     if (financialNodes.length === 0) return;
 
     const pad = NODE_PAD;
-    const cx = size.w / 2;
-    const cy = size.h / 2;
+    const cx = LAYOUT_WIDTH / 2;
+    const cy = LAYOUT_HEIGHT / 2;
 
     const simNodes: SimNode[] = financialNodes.map((n, i) => {
       const radius = radiiMap.get(n.id) ?? 28;
@@ -302,8 +321,9 @@ export function ThreeGraph({
     return () => {
       sim.stop();
     };
+    // Only re-layout when graph structure changes — not on container resize (keeps links and nodes aligned when sidebar toggles)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [financialNodes, financialFlows, radiiMap, size.w, size.h]);
+  }, [financialNodes, financialFlows, radiiMap]);
 
   // Position lookup for edges (same as node positions — nodes move with lines)
   const posMap = useMemo(() => {
@@ -311,6 +331,26 @@ export function ThreeGraph({
     for (const n of nodes) m.set(n.id, { x: n.x, y: n.y, radius: n.radius });
     return m;
   }, [nodes]);
+
+  // Notify parent of current graph snapshot (for simulation overlay)
+  useEffect(() => {
+    if (!onGraphSnapshot || nodes.length === 0) return;
+    const snapshotNodes: GraphSnapshotNode[] = nodes
+      .map((n) => {
+        const data = nodeMap.get(n.id);
+        if (!data) return null;
+        return {
+          ...data,
+          metadata: { ...data.metadata },
+          x: n.x,
+          y: n.y,
+          radius: n.radius,
+        } as GraphSnapshotNode;
+      })
+      .filter((n): n is GraphSnapshotNode => n !== null);
+    const snapshotFlows = financialFlows.map((f) => ({ ...f })) as FinancialFlowData[];
+    onGraphSnapshot(snapshotNodes, snapshotFlows);
+  }, [nodes, financialFlows, nodeMap, onGraphSnapshot]);
 
   // Convert screen coordinates (relative to container) to simulation coordinates
   const screenToSim = useCallback((screenX: number, screenY: number) => {
@@ -554,6 +594,7 @@ export function ThreeGraph({
     return () => cancelAnimationFrame(particleRaf);
   }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
 
+<<<<<<< Updated upstream
   // Wheel zoom handler
   useEffect(() => {
     const el = containerRef.current;
@@ -580,6 +621,69 @@ export function ThreeGraph({
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
+=======
+  // Compute zoom transform: fit actual node bounding box when no selection; zoom-to-node when selected
+  const fitParams = useMemo(() => {
+    if (nodes.length === 0) {
+      const cx = size.w / 2;
+      const cy = size.h / 2;
+      const scale = Math.min(size.w / (2 * LAYOUT_RADIUS_X), size.h / (2 * LAYOUT_RADIUS_Y), 1) * 0.9;
+      return { scale, tx: cx * (1 - scale), ty: cy * (1 - scale) };
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      const r = n.radius ?? 28;
+      minX = Math.min(minX, n.x - r);
+      maxX = Math.max(maxX, n.x + r);
+      minY = Math.min(minY, n.y - r);
+      maxY = Math.max(maxY, n.y + r);
+    }
+    // Pad must cover curved edge bulge (curveOffset up to 20) so links aren't clipped at container edge
+    const pad = 120;
+    const boxW = Math.max(maxX - minX + pad * 2, 1);
+    const boxH = Math.max(maxY - minY + pad * 2, 1);
+    const scale = Math.min(size.w / boxW, size.h / boxH) * 0.92;
+    const boxCx = (minX + maxX) / 2;
+    const boxCy = (minY + maxY) / 2;
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    const tx = cx - boxCx * scale;
+    const ty = cy - boxCy * scale;
+    return { scale, tx, ty };
+  }, [nodes, size.w, size.h]);
+
+  const zoomTransform = useMemo(() => {
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    if (zoomTarget && selectedId) {
+      const scale = 1.5;
+      const tx = cx - zoomTarget.x * scale;
+      const ty = cy - zoomTarget.y * scale;
+      return `translate(${tx}px, ${ty}px) scale(${scale})`;
+    }
+    return `translate(${fitParams.tx}px, ${fitParams.ty}px) scale(${fitParams.scale})`;
+  }, [zoomTarget, selectedId, size.w, size.h, fitParams]);
+
+  // Keep zoom params ref in sync for drag coordinate conversion (always set so screenToSim works)
+  useEffect(() => {
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    if (zoomTarget && selectedId) {
+      const scale = 1.5;
+      zoomParamsRef.current = {
+        tx: cx - zoomTarget.x * scale,
+        ty: cy - zoomTarget.y * scale,
+        scale,
+      };
+    } else {
+      zoomParamsRef.current = {
+        tx: fitParams.tx,
+        ty: fitParams.ty,
+        scale: fitParams.scale,
+      };
+    }
+  }, [zoomTarget, selectedId, size.w, size.h, fitParams]);
+>>>>>>> Stashed changes
 
   // Selected node data for popup
   const selectedNode = useMemo(() => {
@@ -601,8 +705,9 @@ export function ThreeGraph({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden"
+      className="relative w-full h-full"
       onClick={handleCanvasClick}
+<<<<<<< Updated upstream
       onMouseDown={(e) => {
         const t = e.target as HTMLElement;
         if (t.closest("button") || t.closest("[data-node-id]")) return;
@@ -617,6 +722,9 @@ export function ThreeGraph({
         };
       }}
       style={{ cursor: isDragging ? "grabbing" : "grab" }}
+=======
+      style={{ cursor: draggingRef.current ? "grabbing" : "default", overflow: "visible" }}
+>>>>>>> Stashed changes
     >
       {/* Static: background glow (vector + gradient) — no animation */}
       <Image
@@ -640,28 +748,40 @@ export function ThreeGraph({
         className="absolute inset-0 origin-center"
         style={{
           zIndex: 1,
+          overflow: "visible",
           opacity: graphIntroDone ? 1 : 0,
           transform: graphIntroDone ? "scale(1)" : "scale(0.65)",
           transition: "opacity 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 700ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
         }}
       >
-        {/* Zoom wrapper */}
         <div
           className="relative"
           style={{
             width: "100%",
             height: "100%",
+<<<<<<< Updated upstream
             transform: `translate(${camera.tx}px, ${camera.ty}px) scale(${camera.scale})`,
             transition: smoothCamera ? "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)" : "none",
+=======
+            overflow: "visible",
+            transform: zoomTransform,
+            transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+>>>>>>> Stashed changes
             transformOrigin: "0 0",
           }}
         >
-        {/* SVG edges — same coordinate space as nodes so lines move with nodes */}
+        {/* SVG edges — same coordinate space as nodes: SVG positioned over sim bounds, path coords offset so 1:1 with wrapper pixels */}
         <svg
-          className="absolute inset-0 w-full h-full"
-          width={size.w}
-          height={size.h}
-          style={{ zIndex: 1, pointerEvents: "none" }}
+          className="absolute w-full h-full"
+          width={SVG_VIEWBOX_W}
+          height={SVG_VIEWBOX_H}
+          overflow="visible"
+          style={{
+            left: SVG_VIEWBOX_X,
+            top: SVG_VIEWBOX_Y,
+            zIndex: 1,
+            pointerEvents: "none",
+          }}
         >
           {financialFlows.map((flow) => {
             const src = posMap.get(flow.source);
@@ -682,10 +802,12 @@ export function ThreeGraph({
             const isActive = isConnectedToSelected || isConnectedToHovered;
             const dimmed = (selectedId ?? hoveredId) && !isActive;
 
+            const ox = -SVG_VIEWBOX_X;
+            const oy = -SVG_VIEWBOX_Y;
             return (
               <path
                 key={flow.id}
-                d={`M ${src.x} ${src.y} Q ${mx} ${my} ${tgt.x} ${tgt.y}`}
+                d={`M ${src.x + ox} ${src.y + oy} Q ${mx + ox} ${my + oy} ${tgt.x + ox} ${tgt.y + oy}`}
                 fill="none"
                 stroke={
                   isConnectedToSelected
