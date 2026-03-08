@@ -64,12 +64,21 @@ export async function POST(req: NextRequest) {
     const agentName = resolvedAgent as AgentName;
     const hasStructured = nodes && nodes.length > 0 && flows;
 
+    // Sentinel: if user wants to plan, delegate to Planner
+    const planIntent = /\b(plan|planning|planner|i want to plan|help me plan)\b/i.test(message);
+    const effectiveAgent = agentName === "sentinel" && planIntent ? "planner" : agentName;
+
     // For planner, redirect to dedicated route
-    if (agentName === "planner") {
+    if (effectiveAgent === "planner") {
       const plannerRes = await fetch(new URL("/api/ai/planner", req.url), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodes, flows, graphState, message }),
+        body: JSON.stringify({
+          nodes,
+          flows,
+          graphState,
+          message: planIntent && agentName === "sentinel" ? `[Delegated from Sentinel] ${message}` : message,
+        }),
       });
       const plannerData = await plannerRes.json();
       return NextResponse.json(plannerData);
@@ -78,13 +87,13 @@ export async function POST(req: NextRequest) {
     if (isBackboardConfigured()) {
       try {
         const userId = await resolveUserId();
-        const assistant = await getOrCreateAssistant(agentName);
-        const config = getAgentConfig(agentName);
-        const threadId = await getOrCreateThread(userId, agentName, assistant.assistant_id);
+        const assistant = await getOrCreateAssistant(effectiveAgent as AgentName);
+        const config = getAgentConfig(effectiveAgent as AgentName);
+        const threadId = await getOrCreateThread(userId, effectiveAgent as AgentName, assistant.assistant_id);
 
         let content: string;
 
-        if (agentName === "sentinel") {
+        if (effectiveAgent === "sentinel") {
           if (hasStructured) {
             const metrics = calculateFinancialMetrics(nodes!, flows!);
             const triggered = checkSentinelRules(nodes!, flows!, metrics);
@@ -120,7 +129,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Gemini fallback
-    const handler = geminiHandlers[agentName] ?? geminiHandlers["sentinel"];
+    const handler = geminiHandlers[effectiveAgent] ?? geminiHandlers["sentinel"];
     if (handler) {
       const reply = await handler(graphState || "", message);
       return NextResponse.json({ reply });

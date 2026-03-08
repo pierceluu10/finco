@@ -234,7 +234,7 @@ export function NodePopup({
         {/* Agent Chat */}
         <div className="px-4 py-3">
           <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
-            Ask Librarian
+            Ask Sentinel
           </p>
 
           {chatResponse && (

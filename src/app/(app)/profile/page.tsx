@@ -123,7 +123,15 @@ export default function ProfilePage() {
         {/* Personal Info */}
         <Section title="Personal Info">
           <Field label="First name">
-            <TextInput value={profile.first_name ?? ""} onChange={(v) => update("first_name", v)} placeholder="Your first name" />
+            <TextInput
+              value={
+                profile.first_name && !profile.first_name.includes("@")
+                  ? profile.first_name
+                  : ""
+              }
+              onChange={(v) => update("first_name", v)}
+              placeholder="Your first name"
+            />
           </Field>
           <Field label="Age range">
             <SelectInput value={profile.age_range ?? ""} onChange={(v) => update("age_range", v || null)} options={AGE_RANGES} />

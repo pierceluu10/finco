@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       );
 
       const result = await model.generateContent([
-        { text: "You are the Finco Planner, a financial planning agent for Canadians. Help with future planning: first home savings, emergency funds, debt payoff, TFSA/RRSP/FHSA contributions, and investment readiness. Be concise, grounded in the data provided, and practical." },
+        { text: "You are the Finco Planner, a financial planning agent for Canadians. Help with future planning: emergency funds, savings, debt payoff, TFSA/RRSP/FHSA contributions, and curated stock market suggestions. Be concise, grounded in the data provided, and practical." },
         { text: payload },
       ]);
 

@@ -32,7 +32,10 @@ export async function PUT(req: NextRequest) {
 
     const profileData = {
       user_id: userId,
-      first_name: body.first_name ?? null,
+      first_name:
+        body.first_name && typeof body.first_name === "string" && !body.first_name.includes("@")
+          ? body.first_name
+          : null,
       age_range: body.age_range ?? null,
       province: body.province ?? null,
       currency: body.currency ?? "CAD",

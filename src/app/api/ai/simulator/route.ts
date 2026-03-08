@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
           body.changedNode
         );
 
-        let response = await addMessage(threadId, content, {
+        const response = await addMessage(threadId, content, {
           memory: "off",
         });
 

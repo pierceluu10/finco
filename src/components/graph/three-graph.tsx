@@ -120,12 +120,12 @@ export function ThreeGraph({
   financialNodes,
   financialFlows,
   nodeMap,
-  selectedNodeId,
-  connectedNodeIds,
+  selectedNodeId: _selectedNodeId,
+  connectedNodeIds: _connectedNodeIds,
   onSelectNode,
   onDeselectNode,
-  burstActive,
-  interactionEnabled,
+  burstActive: _burstActive,
+  interactionEnabled: _interactionEnabled,
   graphIntroDone = true,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);

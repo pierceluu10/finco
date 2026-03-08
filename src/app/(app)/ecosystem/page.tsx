@@ -78,7 +78,7 @@ function EcosystemDashboard() {
   const [sidebarIn, setSidebarIn] = useState(false);
   const [contentIn, setContentIn] = useState(false);
   const [graphIn, setGraphIn] = useState(false);
-  const [uiIn, setUiIn] = useState(false);
+  const [_uiIn, setUiIn] = useState(false);
   const [introDone, setIntroDone] = useState(false);
   const [burstActive, setBurstActive] = useState(false);
   const [interactionEnabled, setInteractionEnabled] = useState(false);
@@ -97,7 +97,9 @@ function EcosystemDashboard() {
 
   // ── Dialogs ──
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setters reserved for edit flow
   const [dialogMode, setDialogMode] = useState<DialogMode>("add");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- setters reserved for edit flow
   const [editTarget, setEditTarget] = useState<FinancialNodeData | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);

@@ -2,10 +2,9 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { User, LogOut, Upload as UploadIcon, ArrowUp } from "lucide-react";
+import { User, LogOut, ArrowUp } from "lucide-react";
 import { FincoLogo } from "./logo";
 import { formatCurrency } from "@/lib/utils";
-import { type CsvImportResult } from "@/lib/csv-import";
 import type {
   FinancialNodeData,
   FinancialFlowData,
@@ -125,7 +124,7 @@ const AGENTS: {
     id: "simulator",
     label: "Simulator",
     color: "#7AAFDA",
-    active: false,
+    active: true,
     description:
       "Models the impact of financial changes and explains what happened in clear before/after terms.",
     lastActivity: "Last simulation ran 4 minutes ago.",
@@ -135,11 +134,11 @@ const AGENTS: {
     id: "planner",
     label: "Planner",
     color: "#5B7FC5",
-    active: false,
+    active: true,
     description:
-      "Plans your financial future: emergency funds, first home savings, debt payoff, TFSA/RRSP/FHSA, and curated ETF suggestions.",
+      "Plans your financial future: emergency funds, savings, debt payoff, TFSA/RRSP/FHSA, and curated stock market suggestions.",
     lastActivity: "Ready to help with your financial goals.",
-    lastTimestamp: "Idle",
+    lastTimestamp: "Active",
   },
 ];
 
@@ -151,8 +150,6 @@ const MOCK_MONTHLY = [
   { month: "Feb", income: 9800, expenses: 7600 },
   { month: "Mar", income: 9880, expenses: 7900 },
 ];
-
-const MOCK_NET_WORTH = [-340000, -338000, -335500, -333000, -330000, -326290];
 
 const SUPPORTED_BANKS = [
   "TD",
@@ -355,7 +352,7 @@ function DashboardContent({
   nodeCount,
   flowCount,
   financialNodes,
-  financialFlows,
+  financialFlows: _financialFlows,
 }: {
   totalIncome: number;
   totalExpenses: number;
@@ -376,31 +373,6 @@ function DashboardContent({
     [financialNodes]
   );
   const maxExpense = expenseNodes.length > 0 ? expenseNodes[0].monthlyFlow : 1;
-
-  const monthlySavings = useMemo(
-    () =>
-      financialNodes
-        .filter((n) => n.type === "savings" || n.type === "investment")
-        .reduce((s, n) => s + n.monthlyFlow, 0),
-    [financialNodes]
-  );
-  const savingsRate =
-    totalIncome > 0 ? Math.round((monthlySavings / totalIncome) * 100) : 0;
-
-  const netWorth = useMemo(() => {
-    let assets = 0;
-    let liabilities = 0;
-    for (const n of financialNodes) {
-      if (n.type === "debt") {
-        liabilities += n.currentValue;
-      } else if (n.currentValue > 0) {
-        assets += n.currentValue;
-      } else if (n.currentValue < 0) {
-        liabilities += Math.abs(n.currentValue);
-      }
-    }
-    return assets - liabilities;
-  }, [financialNodes]);
 
   const upcomingPayments = useMemo(() => {
     const payments = financialNodes
@@ -423,8 +395,6 @@ function DashboardContent({
       };
     });
   }, [financialNodes]);
-
-  const nwChange = MOCK_NET_WORTH[5] - MOCK_NET_WORTH[4];
 
   return (
     <>
@@ -531,39 +501,6 @@ function DashboardContent({
       <div className="py-3">
         <SectionLabel>Monthly Trend</SectionLabel>
         <MonthlyTrendChart />
-      </div>
-
-      <Divider />
-
-      {/* SAVINGS RATE */}
-      <div className="py-3">
-        <SectionLabel>Savings Rate</SectionLabel>
-        <SavingsRateRing rate={savingsRate} />
-      </div>
-
-      <Divider />
-
-      {/* NET WORTH */}
-      <div className="py-3">
-        <SectionLabel>Net Worth</SectionLabel>
-        <p
-          className="font-sans mt-1 tabular-nums"
-          style={{ fontWeight: 700, fontSize: 28, color: "#e8e8ff" }}
-        >
-          {formatCurrency(netWorth)}
-        </p>
-        <NetWorthSparkline />
-        <p
-          className="font-sans mt-1"
-          style={{
-            fontWeight: 500,
-            fontSize: 12,
-            color: nwChange >= 0 ? "#4ade80" : "#ff4d6d",
-          }}
-        >
-          {nwChange >= 0 ? "+" : ""}
-          {formatCurrency(nwChange)} vs last month
-        </p>
       </div>
 
       <Divider />
@@ -840,9 +777,9 @@ function AgentCard({
 // ────────────────────────────────────────────────────────────────────────────
 
 export function FinancialsContent({
-  financialNodes,
+  financialNodes: _financialNodes,
   onAddNodeDirect,
-  onCsvImportDirect,
+  onCsvImportDirect: _onCsvImportDirect,
   onParsedCsvMerge,
 }: {
   financialNodes: FinancialNodeData[];
@@ -873,8 +810,8 @@ export function FinancialsContent({
       <div className="py-3">
         <SectionLabel>Import CSV</SectionLabel>
         <CsvImportZone
-          financialNodes={financialNodes}
-          onCsvImportDirect={onCsvImportDirect}
+          financialNodes={_financialNodes}
+          onCsvImportDirect={_onCsvImportDirect}
           onParsedCsvMerge={onParsedCsvMerge}
         />
         <div className="mt-3">
@@ -913,52 +850,6 @@ export function FinancialsContent({
         <SectionLabel>Add Manually</SectionLabel>
         <AddNodeForm onAddNodeDirect={onAddNodeDirect} />
       </div>
-
-      <Divider />
-
-      {/* CONNECT ACCOUNT */}
-      <div className="py-3">
-        <SectionLabel>Connect Account</SectionLabel>
-        <div
-          className="mt-2 text-center"
-          style={{
-            background: "#0a0a14",
-            border: "1px solid #1a1a2e",
-            borderRadius: 12,
-            padding: 20,
-          }}
-        >
-          <p
-            className="font-sans"
-            style={{ fontWeight: 700, fontSize: 15, color: "#e8e8ff" }}
-          >
-            Live Bank Connection
-          </p>
-          <p
-            className="font-sans mt-2"
-            style={{
-              fontWeight: 500,
-              fontSize: 13,
-              color: "#6b6b9a",
-              lineHeight: 1.6,
-            }}
-          >
-            Direct integration with your bank accounts via Plaid. Transactions
-            sync automatically and your ecosystem updates in real time.
-          </p>
-          <span
-            className="font-sans inline-block mt-3 rounded-full px-3 py-1"
-            style={{
-              fontWeight: 700,
-              fontSize: 11,
-              color: "#3a3a5a",
-              background: "#1a1a2e",
-            }}
-          >
-            Coming Soon
-          </span>
-        </div>
-      </div>
     </>
   );
 }
@@ -970,8 +861,8 @@ export function FinancialsContent({
 type CsvStage = "idle" | "selected" | "loading" | "success" | "error";
 
 function CsvImportZone({
-  financialNodes,
-  onCsvImportDirect,
+  financialNodes: _financialNodes,
+  onCsvImportDirect: _onCsvImportDirect,
   onParsedCsvMerge,
 }: {
   financialNodes: FinancialNodeData[];
@@ -1670,105 +1561,6 @@ function MonthlyTrendChart() {
         </div>
       )}
     </div>
-  );
-}
-
-function SavingsRateRing({ rate }: { rate: number }) {
-  const size = 80;
-  const strokeW = 6;
-  const radius = (size - strokeW) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(rate, 100) / 100) * circumference;
-
-  return (
-    <div className="flex flex-col items-center mt-3">
-      <svg width={size} height={size}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="#1a1a2e"
-          strokeWidth={strokeW}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="#7F7FFA"
-          strokeWidth={strokeW}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="ring-fill"
-          style={
-            {
-              "--ring-circumference": circumference,
-              transform: "rotate(-90deg)",
-              transformOrigin: "50% 50%",
-            } as React.CSSProperties
-          }
-        />
-        <text
-          x="50%"
-          y="50%"
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="font-sans tabular-nums"
-          style={{ fontSize: 18, fontWeight: 700, fill: "#e8e8ff" }}
-        >
-          {rate}%
-        </text>
-      </svg>
-      <span
-        className="font-sans mt-1"
-        style={{ fontWeight: 500, fontSize: 11, color: "#6b6b9a" }}
-      >
-        of income saved
-      </span>
-    </div>
-  );
-}
-
-function NetWorthSparkline() {
-  const data = MOCK_NET_WORTH;
-  const minV = Math.min(...data);
-  const maxV = Math.max(...data);
-  const range = maxV - minV || 1;
-
-  const W = 200;
-  const H = 40;
-  const pad = 2;
-
-  const points = data
-    .map((v, i) => {
-      const x = pad + (i / (data.length - 1)) * (W - pad * 2);
-      const y = H - pad - ((v - minV) / range) * (H - pad * 2);
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  const firstX = pad;
-  const lastX = pad + ((data.length - 1) / (data.length - 1)) * (W - pad * 2);
-  const fillPath = `M${firstX},${H} L${points.split(" ").join(" L")} L${lastX},${H} Z`;
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full mt-1"
-      style={{ height: 40 }}
-      preserveAspectRatio="none"
-    >
-      <path d={fillPath} fill="rgba(127,127,250,0.06)" />
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#7F7FFA"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

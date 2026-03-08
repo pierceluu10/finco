@@ -3,14 +3,6 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  DollarSign,
-  TrendingUp,
-  PiggyBank,
-  CreditCard,
-  Target,
-  BarChart3,
-} from "lucide-react";
 import { FincoLogo } from "@/components/shared/logo";
 import { FinancialsContent } from "@/components/shared/app-sidebar";
 import type {
@@ -29,15 +21,6 @@ const TYPE_MAP: Record<string, FinancialNodeType> = {
   SAVINGS: "savings",
 };
 
-const GOALS = [
-  { id: "spending", label: "Track spending", icon: DollarSign },
-  { id: "invest", label: "Grow investments", icon: TrendingUp },
-  { id: "save", label: "Build savings", icon: PiggyBank },
-  { id: "debt", label: "Pay off debt", icon: CreditCard },
-  { id: "budget", label: "Budget better", icon: Target },
-  { id: "networth", label: "Track net worth", icon: BarChart3 },
-] as const;
-
 function parseName(fullName: string | undefined): { firstName: string; lastName: string } {
   if (!fullName?.trim()) return { firstName: "", lastName: "" };
   const parts = fullName.trim().split(/\s+/);
@@ -53,20 +36,11 @@ export function OnboardingPage({
   const router = useRouter();
   const { firstName: initialFirst, lastName: initialLast } = parseName(user.name);
 
-  const [firstName, setFirstName] = useState(initialFirst);
+  const [firstName, setFirstName] = useState(initialFirst?.includes("@") ? "" : initialFirst);
   const [lastName, setLastName] = useState(initialLast);
-  const [goals, setGoals] = useState<Set<string>>(new Set());
-  const [goalsOther, setGoalsOther] = useState("");
   const [priorityNote, setPriorityNote] = useState("");
   const [onboardingNodes, setOnboardingNodes] = useState<FinancialNodeData[]>([]);
   const [onboardingFlows, setOnboardingFlows] = useState<FinancialFlowData[]>([]);
-
-  const toggleGoal = (id: string) =>
-    setGoals((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
 
   const onAddNodeDirect = useCallback(
     (
@@ -127,8 +101,6 @@ export function OnboardingPage({
           profile: {
             firstName,
             lastName,
-            goals: Array.from(goals),
-            goalsOther: goalsOther.trim() || undefined,
             priorityNote: priorityNote.trim() || undefined,
           },
         })
@@ -137,7 +109,7 @@ export function OnboardingPage({
       /* noop */
     }
     router.push("/ecosystem");
-  }, [onboardingNodes, onboardingFlows, firstName, lastName, goals, goalsOther, priorityNote, router]);
+  }, [onboardingNodes, onboardingFlows, firstName, lastName, priorityNote, router]);
 
   const addedCount = onboardingNodes.length;
 
@@ -222,66 +194,6 @@ export function OnboardingPage({
                 onChange={setPriorityNote}
                 placeholder="e.g. Save for a down payment, pay off credit card, build emergency fund"
               />
-            </div>
-
-            {/* Financial Goals */}
-            <div className="mt-6">
-              <p
-                className="font-sans mb-2"
-                style={{ fontWeight: 700, fontSize: 11, color: "#6b6b9a", textTransform: "uppercase", letterSpacing: "0.1em" }}
-              >
-                Financial Goals
-              </p>
-              <p
-                className="font-sans mb-3"
-                style={{ fontWeight: 500, fontSize: 12, color: "#3a3a5a" }}
-              >
-                Select all that apply — this helps our AI agents assist you better.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {GOALS.map(({ id, label, icon: Icon }) => {
-                  const active = goals.has(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => toggleGoal(id)}
-                      className="font-sans flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-left transition-all"
-                      style={{
-                        background: active ? "rgba(127,127,250,0.08)" : "#0a0a14",
-                        border: active ? "1px solid #7F7FFA" : "1px solid #1a1a2e",
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: active ? "#e8e8ff" : "#6b6b9a",
-                      }}
-                    >
-                      <Icon
-                        size={16}
-                        style={{ color: active ? "#7F7FFA" : "#3a3a5a", flexShrink: 0 }}
-                      />
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Other goals (free text) */}
-              <div className="mt-3">
-                <p
-                  className="font-sans mb-1.5"
-                  style={{ fontWeight: 600, fontSize: 12, color: "#6b6b9a" }}
-                >
-                  Other
-                </p>
-                <input
-                  id="goalsOther"
-                  type="text"
-                  value={goalsOther}
-                  onChange={(e) => setGoalsOther(e.target.value)}
-                  placeholder="Any other goals or notes..."
-                  className="font-sans w-full rounded-lg border bg-[#0a0a14] px-3 py-2.5 outline-none transition placeholder:text-[#3a3a5a] focus:border-[#7F7FFA]/40"
-                  style={{ borderColor: "#1a1a2e", color: "#e8e8ff", fontSize: 14 }}
-                />
-              </div>
             </div>
 
             {/* Quick context */}

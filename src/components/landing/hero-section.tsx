@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 function FloatingShareNode({
   x,
@@ -91,25 +90,11 @@ export function HeroSection() {
         </motion.p>
 
         <motion.div
-          className="flex items-center justify-center gap-7"
+          className="flex items-center justify-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
         >
-          <motion.div
-            whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(127,127,250,0.15)" }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            className="rounded-full"
-          >
-            <Link
-              href="/ecosystem"
-              className="inline-flex h-[49px] w-[196px] items-center justify-center rounded-full border-[1.4px] border-finco-blue font-sans text-[16px] font-bold text-finco-blue transition-colors hover:bg-finco-blue/10"
-            >
-              Visit Ecosystem
-            </Link>
-          </motion.div>
-
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

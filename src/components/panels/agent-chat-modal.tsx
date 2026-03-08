@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { X, Send, Loader2 } from "lucide-react";
 import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
 
@@ -36,15 +37,15 @@ const AGENT_META: Record<
   simulator: {
     label: "Simulator",
     color: "#7AAFDA",
-    statusLabel: "Idle",
-    active: false,
+    statusLabel: "Active",
+    active: true,
     thinkingText: "Comparing changes...",
   },
   planner: {
     label: "Planner",
     color: "#5B7FC5",
-    statusLabel: "Idle",
-    active: false,
+    statusLabel: "Active",
+    active: true,
     thinkingText: "Reviewing your planning context...",
   },
 };
@@ -283,8 +284,7 @@ export function AgentChatModal({
                 className="font-sans text-center"
                 style={{ fontSize: 13, color: "#3a3a5a", maxWidth: 280 }}
               >
-                Start a conversation with {meta.label}. Your full financial
-                graph is shared as context.
+                Start a conversation with {meta.label}.
               </p>
             </div>
           )}
@@ -316,7 +316,20 @@ export function AgentChatModal({
                       }),
                 }}
               >
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                      ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                      li: ({ children }) => <li>{children}</li>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
               </div>
               <span
                 className="font-sans mt-1 px-1"
@@ -344,7 +357,16 @@ export function AgentChatModal({
                   color: "#c8c8e8",
                 }}
               >
-                {streamingText}
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                    li: ({ children }) => <li>{children}</li>,
+                  }}
+                >
+                  {streamingText}
+                </ReactMarkdown>
               </div>
             </div>
           )}

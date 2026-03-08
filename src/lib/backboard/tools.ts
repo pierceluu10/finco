@@ -234,6 +234,7 @@ function handleGetDashboardSummary(ctx: GraphContext): string {
 function handleGetEtfRecommendations(riskLevel?: string, accountType?: string): string {
   try {
     // Dynamic import to avoid bundling ETF data in every route
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- dynamic import for code splitting
     const catalog = require("@/lib/etf/etf-catalog");
     let etfs = catalog.getAllEtfs();
     if (riskLevel) etfs = catalog.filterEtfsByRisk(riskLevel);

@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
 const DURATION = 0.35;
-const EASE = [0.25, 0.46, 0.45, 0.94];
+const EASE = [0.25, 0.46, 0.45, 0.94] as const;
 
 /** Route-specific enter variants so each page feels intentional */
 function getVariants(pathname: string) {

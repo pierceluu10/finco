@@ -30,7 +30,6 @@ import {
   toReactFlowNodes,
   toReactFlowEdges,
   computeAllRadii,
-  getNodeFinancialWeight,
 } from "@/lib/graph-transforms";
 
 const CANVAS_W = 1800;
@@ -190,15 +189,21 @@ export function useFinancialGraph(
       }))
     );
     setRfEdges((prev) =>
-      prev.map((e) => ({
-        ...e,
-        data: {
-          ...e.data,
-          dimmed: selectedNodeId
-            ? e.source !== selectedNodeId && e.target !== selectedNodeId
-            : false,
-        },
-      }))
+      prev.map((e) => {
+        const d = (e.data ?? {}) as Partial<EdgeRfData>;
+        return {
+          ...e,
+          data: {
+            amount: d.amount ?? 0,
+            frequency: d.frequency ?? "monthly",
+            sourceLabel: d.sourceLabel ?? "",
+            targetLabel: d.targetLabel ?? "",
+            dimmed: selectedNodeId
+              ? e.source !== selectedNodeId && e.target !== selectedNodeId
+              : false,
+          },
+        };
+      })
     );
   }, [selectedNodeId, connectedNodeIds, setRfNodes, setRfEdges]);
 
