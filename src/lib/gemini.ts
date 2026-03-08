@@ -65,3 +65,30 @@ If the user asks about future planning, ETFs, or goal timelines, suggest they as
 
   return result.response.text();
 }
+
+const SENTINEL_JSON_SYSTEM =
+  "You are a financial data assistant. You respond only with valid JSON. You never include markdown, explanation, preamble, or any text outside the JSON object. Your determinations are based on common Canadian personal finance patterns.";
+
+const SENTINEL_JSON_TIMEOUT_MS = 3000;
+
+export async function generateSentinelJson(userMessage: string): Promise<Record<string, unknown> | null> {
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  try {
+    const result = await Promise.race([
+      model.generateContent([
+        { text: SENTINEL_JSON_SYSTEM },
+        { text: userMessage },
+      ]),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), SENTINEL_JSON_TIMEOUT_MS)
+      ),
+    ]);
+    const text = result.response.text();
+    const cleaned = text.replace(/```json\s*|\s*```/g, "").trim();
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}

@@ -202,3 +202,9 @@ p, h1, h2, h3, h4, h5, h6, span, a, button, label, input, select, textarea {
   to   { transform: translateX(0); }
 }
 
+/* Link mode: source node pulse */
+@keyframes link-source-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px #00ff88, 0 0 20px rgba(0,255,136,0.5); }
+  50% { box-shadow: 0 0 0 3px #00ff88, 0 0 28px rgba(0,255,136,0.7); }
+}
+

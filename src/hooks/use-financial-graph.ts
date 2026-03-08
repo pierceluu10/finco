@@ -298,7 +298,8 @@ export function useFinancialGraph(
         direction: "to" | "from";
         amount: number;
         frequency: FinancialFlowData["frequency"];
-      }[]
+      }[],
+      initialPosition?: { x: number; y: number }
     ) => {
       const id = `node-${Date.now()}`;
       const newNode: FinancialNodeData = { id, ...data };
@@ -309,6 +310,10 @@ export function useFinancialGraph(
         amount: c.amount,
         frequency: c.frequency,
       }));
+      if (initialPosition) {
+        pinnedRef.current.set(id, initialPosition);
+        layoutRef.current.set(id, initialPosition);
+      }
       setFinancialNodes((prev) => [...prev, newNode]);
       setFinancialFlows((prev) => [...prev, ...newFlows]);
       return id;
@@ -376,6 +381,15 @@ export function useFinancialGraph(
     return id;
   }, []);
 
+  const updateFlow = useCallback(
+    (flowId: string, updates: Partial<Omit<FinancialFlowData, "id">>) => {
+      setFinancialFlows((prev) =>
+        prev.map((f) => (f.id === flowId ? { ...f, ...updates } : f))
+      );
+    },
+    []
+  );
+
   const deleteFlow = useCallback(
     (flowId: string) => {
       setFinancialFlows((prev) => prev.filter((f) => f.id !== flowId));
@@ -438,6 +452,7 @@ export function useFinancialGraph(
     deleteNode,
     bulkAdd,
     addFlow,
+    updateFlow,
     deleteFlow,
     getDeletionImpact,
 

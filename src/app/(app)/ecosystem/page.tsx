@@ -16,6 +16,7 @@ import { DeleteConfirmDialog } from "@/components/panels/delete-confirm-dialog";
 import { CsvUploadDialog } from "@/components/panels/csv-upload-dialog";
 import { AgentChatModal } from "@/components/panels/agent-chat-modal";
 import { SimulationOverlay } from "@/components/panels/simulation-overlay";
+import { StemNodeModal } from "@/components/panels/stem-node-modal";
 import type { GraphSnapshotNode } from "@/components/graph/three-graph";
 import type {
   DialogMode,
@@ -104,6 +105,15 @@ function EcosystemDashboard() {
     flows: FinancialFlowData[];
   } | null>(null);
   const graphSnapshotRef = useRef<{ nodes: GraphSnapshotNode[]; flows: FinancialFlowData[] } | null>(null);
+
+  const [stemModalOpen, setStemModalOpen] = useState(false);
+  const [stemParentNode, setStemParentNode] = useState<FinancialNodeData | null>(null);
+  const [stemParentPosition, setStemParentPosition] = useState<{ x: number; y: number } | null>(null);
+  const [linkModeSourceId, setLinkModeSourceId] = useState<string | null>(null);
+  const [linkToast, setLinkToast] = useState<string | null>(null);
+  const linkToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flashNodeId, setFlashNodeId] = useState<string | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const deletionImpact = useMemo(
     () => (deleteTarget ? graph.getDeletionImpact(deleteTarget) : null),
@@ -263,6 +273,156 @@ function EcosystemDashboard() {
     [graph]
   );
 
+  const handleUpdateNodeValue = useCallback(
+    (nodeId: string, value: number, field: "currentValue" | "monthlyFlow") => {
+      const node = graph.nodeMap.get(nodeId);
+      if (!node) return;
+      const before = field === "currentValue" ? node.currentValue : node.monthlyFlow;
+      graph.updateNode(nodeId, { [field]: value });
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      setFlashNodeId(nodeId);
+      flashTimerRef.current = setTimeout(() => setFlashNodeId(null), 300);
+      const graphState = `Node "${node.label}" ${field} changed from ${before} to ${value}.`;
+      fetch("/api/ai/sentinel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          graphState,
+          message: "Briefly note any impact on the user's finances.",
+        }),
+      }).catch(() => {});
+    },
+    [graph]
+  );
+
+  const handleRequestStemNode = useCallback(
+    (parentNode: FinancialNodeData, parentPosition: { x: number; y: number }) => {
+      setStemParentNode(parentNode);
+      setStemParentPosition(parentPosition);
+      setStemModalOpen(true);
+    },
+    []
+  );
+
+  const handleStemSubmit = useCallback(
+    (
+      data: Omit<FinancialNodeData, "id">,
+      connections: { targetId: string; direction: "to" | "from"; amount: number; frequency: FinancialFlowData["frequency"] }[],
+      initialPosition: { x: number; y: number }
+    ) => {
+      const newNodeId = graph.addNode(data, connections, initialPosition);
+      const parentId = stemParentNode?.id;
+      if (parentId) {
+        const flow = graph.financialFlows.find(
+          (f) => (f.source === newNodeId && f.target === parentId) || (f.source === parentId && f.target === newNodeId)
+        );
+        if (flow) {
+          const newNode = graph.nodeMap.get(newNodeId);
+          const parentNode = graph.nodeMap.get(parentId);
+          if (newNode && parentNode) {
+            fetch("/api/ai/sentinel-json", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userMessage: `Two financial nodes are being linked. Analyze both and determine the direction of money flow between them.
+
+Node A: name '${parentNode.label}', type ${parentNode.type}, amount ${parentNode.currentValue > 0 ? parentNode.currentValue : parentNode.monthlyFlow}
+Node B: name '${newNode.label}', type ${newNode.type}, amount ${newNode.currentValue > 0 ? newNode.currentValue : newNode.monthlyFlow}
+
+Determine:
+1. direction: either 'AtoB' or 'BtoA' indicating which node sends money to the other
+2. flowAmount: a realistic monthly flow amount in CAD based on both node amounts
+3. frequency: monthly, weekly, or annual
+4. reasoning: one sentence explaining the money relationship
+
+Return only a JSON object with these four fields. No explanation. No markdown.`,
+              }),
+            })
+              .then((r) => r.json())
+              .then((res) => {
+                const d = res.data as Record<string, unknown> | null;
+                if (d && typeof d.direction === "string" && typeof d.flowAmount === "number") {
+                  const dir = String(d.direction).toUpperCase();
+                  const freq = (typeof d.frequency === "string" ? d.frequency : "monthly") as FinancialFlowData["frequency"];
+                  if (dir === "BTOA") {
+                    graph.updateFlow(flow.id, { source: newNodeId, target: parentId, amount: d.flowAmount, frequency: freq });
+                  } else {
+                    graph.updateFlow(flow.id, { source: parentId, target: newNodeId, amount: d.flowAmount, frequency: freq });
+                  }
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      }
+      return newNodeId;
+    },
+    [graph, stemParentNode]
+  );
+
+  const handleRequestLinkMode = useCallback(() => {
+    if (graph.selectedNodeId) setLinkModeSourceId(graph.selectedNodeId);
+  }, [graph.selectedNodeId]);
+
+  const handleLinkTargetSelected = useCallback(
+    async (targetNodeId: string) => {
+      const sourceId = linkModeSourceId;
+      if (!sourceId || sourceId === targetNodeId) return;
+      const nodeA = graph.nodeMap.get(sourceId);
+      const nodeB = graph.nodeMap.get(targetNodeId);
+      if (!nodeA || !nodeB) return;
+      try {
+        const res = await fetch("/api/ai/sentinel-json", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userMessage: `Two financial nodes are being linked. Analyze both and determine the direction of money flow between them.
+
+Node A: name '${nodeA.label}', type ${nodeA.type}, amount ${nodeA.currentValue > 0 ? nodeA.currentValue : nodeA.monthlyFlow}
+Node B: name '${nodeB.label}', type ${nodeB.type}, amount ${nodeB.currentValue > 0 ? nodeB.currentValue : nodeB.monthlyFlow}
+
+Determine:
+1. direction: either 'AtoB' or 'BtoA' indicating which node sends money to the other
+2. flowAmount: a realistic monthly flow amount in CAD based on both node amounts
+3. frequency: monthly, weekly, or annual
+4. reasoning: one sentence explaining the money relationship
+
+Return only a JSON object with these four fields. No explanation. No markdown.`,
+          }),
+        });
+        const data = await res.json();
+        const d = data.data as Record<string, unknown> | null;
+        const _confidence = typeof d?.confidence === "string" ? d.confidence : "";
+        let source = sourceId;
+        let target = targetNodeId;
+        let flowAmount = 0;
+        let frequency: FinancialFlowData["frequency"] = "monthly";
+        if (d && typeof d.direction === "string" && typeof d.flowAmount === "number") {
+          flowAmount = d.flowAmount;
+          frequency = (typeof d.frequency === "string" ? d.frequency : "monthly") as FinancialFlowData["frequency"];
+          if (String(d.direction).toUpperCase() === "BTOA") {
+            source = targetNodeId;
+            target = sourceId;
+          }
+        }
+        graph.addFlow({ source, target, amount: flowAmount, frequency });
+        const fromLabel = graph.nodeMap.get(source)?.label ?? source;
+        const toLabel = graph.nodeMap.get(target)?.label ?? target;
+        if (linkToastTimerRef.current) clearTimeout(linkToastTimerRef.current);
+        setLinkToast(`${fromLabel} → ${toLabel} linked · $${flowAmount}/${frequency}`);
+        linkToastTimerRef.current = setTimeout(() => setLinkToast(null), 3000);
+      } finally {
+        setLinkModeSourceId(null);
+        graph.setSelectedNodeId(sourceId);
+      }
+    },
+    [linkModeSourceId, graph]
+  );
+
+  const handleCancelLinkMode = useCallback(() => {
+    setLinkModeSourceId(null);
+  }, []);
+
   // Sidebar intro styles
   const sidebarOuter: React.CSSProperties | undefined =
     !introDone
@@ -357,6 +517,13 @@ function EcosystemDashboard() {
             interactionEnabled={interactionEnabled}
             graphIntroDone={graphIn}
             onGraphSnapshot={handleGraphSnapshot}
+            onUpdateNodeValue={handleUpdateNodeValue}
+            onRequestStemNode={handleRequestStemNode}
+            onRequestLinkMode={handleRequestLinkMode}
+            linkModeSourceId={linkModeSourceId}
+            onLinkTargetSelected={handleLinkTargetSelected}
+            onCancelLinkMode={handleCancelLinkMode}
+            flashNodeId={flashNodeId}
           />
 
           <div
@@ -424,6 +591,37 @@ function EcosystemDashboard() {
             flows={simulationPayload.flows}
             onApply={handleSimulationApply}
           />
+        )}
+
+        {stemModalOpen && stemParentNode && stemParentPosition && (
+          <StemNodeModal
+            open={stemModalOpen}
+            onClose={() => {
+              setStemModalOpen(false);
+              setStemParentNode(null);
+              setStemParentPosition(null);
+            }}
+            parentNode={stemParentNode}
+            parentPosition={stemParentPosition}
+            onSubmit={handleStemSubmit}
+            onOpenNewNodePopup={(nodeId) => {
+              graph.setSelectedNodeId(nodeId);
+            }}
+          />
+        )}
+
+        {linkToast && (
+          <div
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] font-sans font-semibold text-[13px] text-[#e8e8ff] rounded-lg px-4 py-3"
+            style={{
+              background: "#0a0a14",
+              border: "1px solid rgba(0,255,136,0.2)",
+              borderLeft: "3px solid #00ff88",
+              animation: "toastIn 300ms ease",
+            }}
+          >
+            {linkToast}
+          </div>
         )}
 
         {toast && (

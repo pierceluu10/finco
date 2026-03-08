@@ -315,7 +315,7 @@ export function AppSidebar({
         {/* Footer */}
         <div className="shrink-0 border-t border-white/5 p-2 space-y-0.5">
           <Link
-            href="/profile"
+            href="/onboarding"
             className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-white/5 hover:text-zinc-300 transition font-sans"
           >
             <User className="h-3 w-3" />
@@ -840,12 +840,6 @@ export function FinancialsContent({
   return (
     <>
       <div className="pt-4 pb-3">
-        <p
-          className="font-sans"
-          style={{ fontWeight: 800, fontSize: 18, color: "#e8e8ff" }}
-        >
-          Your Financials
-        </p>
         <p
           className="font-sans mt-0.5"
           style={{ fontWeight: 500, fontSize: 13, color: "#6b6b9a" }}

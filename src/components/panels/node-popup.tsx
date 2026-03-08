@@ -15,6 +15,9 @@ interface NodePopupProps {
   anchorY: number;
   containerWidth: number;
   containerHeight: number;
+  onUpdateValue?: (nodeId: string, value: number, field: "currentValue" | "monthlyFlow") => void;
+  onStemNode?: () => void;
+  onLinkNode?: () => void;
 }
 
 function serializeNodeContext(
@@ -49,17 +52,63 @@ export function NodePopup({
   anchorY,
   containerWidth,
   containerHeight,
+  onUpdateValue,
+  onStemNode,
+  onLinkNode,
 }: NodePopupProps) {
   const [visible, setVisible] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatResponse, setChatResponse] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [editingValue, setEditingValue] = useState(false);
+  const [editInputValue, setEditInputValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const color = getNodeColor(node.type);
   const inbound = connectedFlows.filter((f) => f.target === node.id);
   const outbound = connectedFlows.filter((f) => f.source === node.id);
+
+  const primaryValue = node.currentValue > 0 ? node.currentValue : node.monthlyFlow;
+  const primaryField: "currentValue" | "monthlyFlow" = node.currentValue > 0 ? "currentValue" : "monthlyFlow";
+  const showPerMo = node.currentValue <= 0 && node.monthlyFlow > 0;
+
+  const startEditing = useCallback(() => {
+    const str = String(primaryValue);
+    setEditInputValue(str);
+    setEditingValue(true);
+    setTimeout(() => {
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }, 0);
+  }, [primaryValue]);
+
+  const confirmEdit = useCallback(() => {
+    const num = parseFloat(editInputValue.replace(/[^0-9.-]/g, ""));
+    if (!Number.isFinite(num) || num < 0) {
+      setEditingValue(false);
+      setEditInputValue(String(primaryValue));
+      return;
+    }
+    setEditingValue(false);
+    onUpdateValue?.(node.id, num, primaryField);
+  }, [editInputValue, primaryValue, primaryField, node.id, onUpdateValue]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingValue(false);
+    setEditInputValue(String(primaryValue));
+  }, [primaryValue]);
+
+  useEffect(() => {
+    if (!editingValue) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (popupRef.current?.contains(e.target as Node)) return;
+      confirmEdit();
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [editingValue, confirmEdit]);
 
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 50);
@@ -143,12 +192,42 @@ export function NodePopup({
               {node.type}
             </span>
           </div>
-          <span className="font-bold text-[22px]" style={{ color: "#e8e8ff", fontFamily: "'Manrope', sans-serif" }}>
-            {formatCurrency(node.currentValue > 0 ? node.currentValue : node.monthlyFlow)}
-            {node.currentValue <= 0 && node.monthlyFlow > 0 && (
-              <span className="font-sans text-[13px] font-medium" style={{ color: "#6b6b9a" }}>/mo</span>
-            )}
-          </span>
+          {editingValue ? (
+            <input
+              ref={editInputRef}
+              type="text"
+              value={editInputValue}
+              onChange={(e) => setEditInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmEdit();
+                if (e.key === "Escape") cancelEdit();
+              }}
+              className="font-bold outline-none w-full min-w-[80px]"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 700,
+                fontSize: 22,
+                color: "#e8e8ff",
+                background: "#050508",
+                border: "1px solid rgba(127,127,250,0.5)",
+                borderRadius: 6,
+                padding: "4px 8px",
+              }}
+            />
+          ) : (
+            <span
+              role="button"
+              tabIndex={0}
+              onDoubleClick={startEditing}
+              className="font-bold cursor-default select-none"
+              style={{ color: "#e8e8ff", fontFamily: "'Manrope', sans-serif", fontSize: 22 }}
+            >
+              {formatCurrency(primaryValue)}
+              {showPerMo && (
+                <span className="font-sans text-[13px] font-medium" style={{ color: "#6b6b9a" }}>/mo</span>
+              )}
+            </span>
+          )}
         </div>
 
         <div style={{ height: 1, background: "#1a1a2e" }} />
@@ -201,6 +280,50 @@ export function NodePopup({
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Stem Node + Link to Node */}
+        <div className="px-4 py-2 space-y-2">
+          {onStemNode && (
+            <button
+              type="button"
+              onClick={onStemNode}
+              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(127,127,250,0.2)",
+                color: "#7F7FFA",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(127,127,250,0.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              + Stem Node
+            </button>
+          )}
+          {onLinkNode && (
+            <button
+              type="button"
+              onClick={onLinkNode}
+              className="w-full font-sans font-semibold text-[13px] transition rounded-lg py-2.5"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(0,255,136,0.2)",
+                color: "#00ff88",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(0,255,136,0.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              Link to Node
+            </button>
+          )}
         </div>
 
         <div style={{ height: 1, background: "#1a1a2e" }} />

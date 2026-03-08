@@ -11,6 +11,7 @@ export const NODE_COLORS: Record<FinancialNodeType, string> = {
   debt:       "#FB923C", // amber/orange — obligations
   savings:    "#38BDF8", // sky blue — safe, stored
   investment: "#A78BFA", // violet — growth / long-term
+  buffer:     "#7F7FFA", // brand indigo — buffer/slack
 };
 
 export function getNodeColor(type: FinancialNodeType): string {

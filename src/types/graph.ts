@@ -8,7 +8,8 @@ export type FinancialNodeType =
   | "expense"
   | "debt"
   | "savings"
-  | "investment";
+  | "investment"
+  | "buffer";
 
 export interface FinancialNodeData {
   id: string;

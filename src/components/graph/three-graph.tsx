@@ -72,6 +72,13 @@ export interface ThreeGraphProps {
   graphIntroDone?: boolean;
   /** Called when node positions/layout change; use to snapshot graph for simulation overlay. */
   onGraphSnapshot?: (nodes: GraphSnapshotNode[], flows: FinancialFlowData[]) => void;
+  onUpdateNodeValue?: (nodeId: string, value: number, field: "currentValue" | "monthlyFlow") => void;
+  onRequestStemNode?: (parentNode: FinancialNodeData, parentPosition: { x: number; y: number }) => void;
+  onRequestLinkMode?: () => void;
+  linkModeSourceId?: string | null;
+  onLinkTargetSelected?: (targetNodeId: string) => void;
+  onCancelLinkMode?: () => void;
+  flashNodeId?: string | null;
 }
 
 /** Node data + layout position for simulation overlay snapshot */
@@ -138,7 +145,7 @@ export function ThreeGraph({
   financialNodes,
   financialFlows,
   nodeMap,
-  selectedNodeId: _selectedNodeId,
+  selectedNodeId: selectedNodeIdProp,
   connectedNodeIds: _connectedNodeIds,
   onSelectNode,
   onDeselectNode,
@@ -146,6 +153,13 @@ export function ThreeGraph({
   interactionEnabled: _interactionEnabled,
   graphIntroDone = true,
   onGraphSnapshot,
+  onUpdateNodeValue,
+  onRequestStemNode,
+  onRequestLinkMode,
+  linkModeSourceId = null,
+  onLinkTargetSelected,
+  onCancelLinkMode,
+  flashNodeId = null,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -156,6 +170,10 @@ export function ThreeGraph({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [flowView, setFlowView] = useState(false);
+
+  useEffect(() => {
+    setSelectedId(selectedNodeIdProp);
+  }, [selectedNodeIdProp]);
   const [size, setSize] = useState({ w: 1000, h: 700 });
   const [isDragging, setIsDragging] = useState(false);
 
@@ -443,6 +461,10 @@ export function ThreeGraph({
   const handleNodeClick = useCallback(
     (nodeId: string) => {
       if (didDragRef.current) return;
+      if (linkModeSourceId) {
+        if (nodeId !== linkModeSourceId) onLinkTargetSelected?.(nodeId);
+        return;
+      }
       if (selectedId === nodeId) {
         setSelectedId(null);
         const reset = { tx: 0, ty: 0, scale: 1 };
@@ -467,7 +489,7 @@ export function ThreeGraph({
         onSelectNode(nodeId);
       }
     },
-    [selectedId, posMap, onSelectNode, onDeselectNode, size.w, size.h]
+    [selectedId, linkModeSourceId, onLinkTargetSelected, posMap, onSelectNode, onDeselectNode, size.w, size.h]
   );
 
   const handleCanvasClick = useCallback(() => {
@@ -484,6 +506,15 @@ export function ThreeGraph({
       onDeselectNode();
     }
   }, [selectedId, onDeselectNode]);
+
+  useEffect(() => {
+    if (!linkModeSourceId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancelLinkMode?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [linkModeSourceId, onCancelLinkMode]);
 
   // ── Flow view particles (along the connecting lines) ──
   useEffect(() => {
@@ -658,6 +689,19 @@ export function ThreeGraph({
       }}
       style={{ cursor: isDragging ? "grabbing" : "grab" }}
     >
+      {/* Link mode banner */}
+      {linkModeSourceId && (
+        <div
+          className="absolute top-0 left-0 right-0 z-[100] font-sans font-semibold text-[13px] text-[#e8e8ff] px-4 py-3.5"
+          style={{
+            background: "rgba(8,8,15,0.95)",
+            borderBottom: "1px solid #1a1a2e",
+          }}
+        >
+          Click any node to link it to {nodeMap.get(linkModeSourceId)?.label ?? linkModeSourceId}
+        </div>
+      )}
+
       {/* Static: background glow (vector + gradient) — no animation */}
       <Image
         src="/images/Vector.png"
@@ -769,8 +813,12 @@ export function ThreeGraph({
           const isSelected = selectedId === node.id;
           const activeId = selectedId ?? hoveredId;
           const isConnected = connectedSet.has(node.id);
-          const dimmed = activeId !== null && !isHovered && !isSelected && !isConnected;
-
+          let dimmed = activeId !== null && !isHovered && !isSelected && !isConnected;
+          const isLinkSource = linkModeSourceId === node.id;
+          const isFlash = flashNodeId === node.id;
+          if (linkModeSourceId) {
+            dimmed = !isLinkSource;
+          }
           return (
             <div
               key={node.id}
@@ -779,10 +827,10 @@ export function ThreeGraph({
               style={{
                 left: node.x,
                 top: node.y,
-                transform: `translate(-50%, -50%) scale(${isHovered || isSelected ? 1.12 : 1})`,
+                transform: `translate(-50%, -50%) scale(${isFlash ? 1.2 : isHovered || isSelected ? 1.12 : 1})`,
                 transition: draggingRef.current === node.id ? "none" : "transform 200ms ease, opacity 200ms ease",
-                opacity: dimmed ? 0.3 : 1,
-                zIndex: isHovered || isSelected ? 10 : 2,
+                opacity: dimmed ? 0.4 : 1,
+                zIndex: isHovered || isSelected || isLinkSource ? 10 : 2,
                 cursor: draggingRef.current === node.id ? "grabbing" : "grab",
               }}
               onMouseEnter={() => { if (!draggingRef.current) setHoveredId(node.id); }}
@@ -800,13 +848,18 @@ export function ThreeGraph({
                   height: node.radius * 2,
                   borderRadius: "50%",
                   background: darken(node.color, 0.15),
-                  boxShadow: isHovered || isSelected
-                    ? `0 0 20px ${node.color}40`
-                    : "none",
+                  boxShadow: isLinkSource
+                    ? `0 0 0 2px #00ff88, 0 0 20px rgba(0,255,136,0.5)`
+                    : isFlash
+                      ? `0 0 24px rgba(0,255,136,0.8), 0 0 40px rgba(0,255,136,0.3)`
+                      : isHovered || isSelected
+                        ? `0 0 20px ${node.color}40`
+                        : "none",
                   transition: "box-shadow 200ms ease",
                   border: `1.5px solid ${node.color}30`,
                   position: "relative",
                   zIndex: 2,
+                  animation: isLinkSource ? "link-source-pulse 1.5s ease-in-out infinite" : undefined,
                 }}
               />
               {/* Label */}
@@ -877,8 +930,8 @@ export function ThreeGraph({
         </button>
       </div>
 
-      {/* Node popup — rendered outside the zoom wrapper so it doesn't scale */}
-      {selectedNode && popupAnchor && (
+      {/* Node popup — rendered outside the zoom wrapper so it doesn't scale; hidden in link mode */}
+      {selectedNode && popupAnchor && !linkModeSourceId && (
         <NodePopup
           node={selectedNode}
           connectedFlows={connectedFlows}
@@ -895,6 +948,16 @@ export function ThreeGraph({
           anchorY={popupAnchor.y}
           containerWidth={size.w}
           containerHeight={size.h}
+          onUpdateValue={onUpdateNodeValue}
+          onStemNode={
+            onRequestStemNode && selectedId
+              ? () => {
+                  const pos = posMap.get(selectedId);
+                  if (pos) onRequestStemNode(selectedNode, pos);
+                }
+              : undefined
+          }
+          onLinkNode={onRequestLinkMode}
         />
       )}
     </div>
