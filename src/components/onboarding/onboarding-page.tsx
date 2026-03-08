@@ -209,36 +209,25 @@ export function OnboardingPage({
               >
                 How Finco Works
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { num: "1", text: "Add your financial accounts, income and expenses" },
-                  { num: "2", text: "See your money as a living, interactive graph" },
-                  { num: "3", text: "Get AI insights and run what-if simulations" },
-                ].map((step) => (
-                  <div
-                    key={step.num}
-                    className="rounded-lg p-3"
-                    style={{ background: "#0a0a14", border: "1px solid #1a1a2e" }}
-                  >
-                    <span
-                      className="font-sans inline-flex h-5 w-5 items-center justify-center rounded-full tabular-nums"
-                      style={{
-                        background: "rgba(127,127,250,0.12)",
-                        color: "#7F7FFA",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {step.num}
-                    </span>
-                    <p
-                      className="font-sans mt-2"
-                      style={{ fontWeight: 500, fontSize: 12, color: "#6b6b9a", lineHeight: 1.5 }}
-                    >
-                      {step.text}
-                    </p>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                <p
+                  className="font-sans"
+                  style={{ fontWeight: 500, fontSize: 12, color: "#6b6b9a", lineHeight: 1.6 }}
+                >
+                  Add your income, debts, savings and expenses — or upload a bank CSV and let AI build your ecosystem automatically
+                </p>
+                <p
+                  className="font-sans"
+                  style={{ fontWeight: 500, fontSize: 12, color: "#6b6b9a", lineHeight: 1.6 }}
+                >
+                  See your entire financial life as a living node graph where every dollar flow is visible and connected
+                </p>
+                <p
+                  className="font-sans"
+                  style={{ fontWeight: 500, fontSize: 12, color: "#6b6b9a", lineHeight: 1.6 }}
+                >
+                  Three AI agents monitor your ecosystem, fire alerts when something needs attention, and let you simulate any financial change before it happens
+                </p>
               </div>
             </div>
           </div>
@@ -251,6 +240,7 @@ export function OnboardingPage({
               financialNodes={onboardingNodes}
               onAddNodeDirect={onAddNodeDirect}
               onParsedCsvMerge={onParsedCsvMerge}
+              variant="onboarding"
             />
 
             {addedCount > 0 && (

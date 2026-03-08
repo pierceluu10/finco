@@ -190,3 +190,15 @@ export function checkSentinelRules(
 
   return triggered;
 }
+
+/**
+ * Pure function: returns only the list of triggered rule ids.
+ * No side effects, no API calls, no state. Use with useMemo in hooks.
+ */
+export function runSentinelRules(
+  nodes: FinancialNodeData[],
+  flows: FinancialFlowData[]
+): string[] {
+  const triggered = checkSentinelRules(nodes, flows);
+  return triggered.map((r) => r.ruleId);
+}

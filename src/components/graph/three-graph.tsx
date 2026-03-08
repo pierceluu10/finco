@@ -108,6 +108,8 @@ function quadBezierPoint(
 
 interface Particle {
   flowId: string;
+  sourceId: string;
+  targetId: string;
   t: number;
   speed: number;
   isIncome: boolean; // green if true, red if false
@@ -171,7 +173,7 @@ export function ThreeGraph({
   const [nodes, setNodes] = useState<NodeView[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [flowView, setFlowView] = useState(false);
+  const [flowView, setFlowView] = useState(true);
 
   useEffect(() => {
     setSelectedId(selectedNodeIdProp);
@@ -351,6 +353,10 @@ export function ThreeGraph({
     for (const n of nodes) m.set(n.id, { x: n.x, y: n.y, radius: n.radius });
     return m;
   }, [nodes]);
+
+  // Ref so the particle draw loop always uses the latest positions (avoids stale closure for links that were missing)
+  const posMapRef = useRef(posMap);
+  posMapRef.current = posMap;
 
   // Fit all nodes in view (on load and when nodes/size change); no zoom in/out — graph stays within bounds
   const FIT_PADDING = 48;
@@ -565,10 +571,14 @@ export function ThreeGraph({
       const amount = Math.max(0, flow.amount);
       const t = amount <= 0 ? 0.5 : Math.min(1, amount / maxAmount);
       const speed = minSpeed + t * (maxSpeed - minSpeed);
-      for (let i = 0; i < 3; i++) {
+      // Every flow gets particles so no link is left without flow animation
+      const count = 3;
+      for (let i = 0; i < count; i++) {
         particles.push({
           flowId: flow.id,
-          t: i / 3,
+          sourceId: flow.source,
+          targetId: flow.target,
+          t: i / count,
           speed: speed * (0.95 + Math.random() * 0.1),
           isIncome,
         });
@@ -585,8 +595,6 @@ export function ThreeGraph({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const activeId = selectedId ?? hoveredId;
-
     let particleRaf: number;
     const drawParticles = () => {
       canvas.width = size.w;
@@ -594,13 +602,9 @@ export function ThreeGraph({
       ctx.clearRect(0, 0, size.w, size.h);
 
       for (const p of particlesRef.current) {
-        const flow = financialFlows.find((f) => f.id === p.flowId);
-        if (!flow) continue;
-        // When a node is focused, only show particles on its connected links; otherwise show all
-        if (activeId && flow.source !== activeId && flow.target !== activeId) continue;
-
-        const src = posMap.get(flow.source);
-        const tgt = posMap.get(flow.target);
+        const map = posMapRef.current;
+        const src = map.get(p.sourceId);
+        const tgt = map.get(p.targetId);
         if (!src || !tgt) continue;
 
         // Advance particle
@@ -654,7 +658,7 @@ export function ThreeGraph({
 
     particleRaf = requestAnimationFrame(drawParticles);
     return () => cancelAnimationFrame(particleRaf);
-  }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
+  }, [flowView, financialFlows, posMap, size.w, size.h]);
 
   // Selected node data for popup
   const selectedNode = useMemo(() => {

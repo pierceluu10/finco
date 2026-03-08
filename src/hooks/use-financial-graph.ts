@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useCallback, useMemo, useRef, useEffect } from "react";
 import {
   useNodesState,
   useEdgesState,
@@ -18,6 +18,14 @@ import {
   type SimulationNodeDatum,
   type SimulationLinkDatum,
 } from "d3-force";
+import { useShallow } from "zustand/react/shallow";
+import {
+  useGraphStore,
+  selectNodes,
+  selectEdges,
+  selectSelectedNodeId,
+  selectSelectedEdgeId,
+} from "@/stores/graph-store";
 import type {
   FinancialNodeData,
   FinancialFlowData,
@@ -44,10 +52,23 @@ export function useFinancialGraph(
   initialNodes: FinancialNodeData[],
   initialFlows: FinancialFlowData[]
 ) {
-  const [financialNodes, setFinancialNodes] =
-    useState<FinancialNodeData[]>(initialNodes);
-  const [financialFlows, setFinancialFlows] =
-    useState<FinancialFlowData[]>(initialFlows);
+  const initedRef = useRef(false);
+  useEffect(() => {
+    if (initedRef.current) return;
+    initedRef.current = true;
+    const store = useGraphStore.getState();
+    if (store.version === 0 && (initialNodes.length > 0 || initialFlows.length > 0)) {
+      store.init(initialNodes, initialFlows);
+    }
+    // Intentionally run once on mount; initialNodes/initialFlows are not in deps to avoid
+    // re-running when parent re-renders with new array references (single source of truth init).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const financialNodes = useGraphStore(useShallow(selectNodes));
+  const financialFlows = useGraphStore(useShallow(selectEdges));
+  const selectedNodeId = useGraphStore(selectSelectedNodeId);
+  const selectedEdgeId = useGraphStore(selectSelectedEdgeId);
 
   const pinnedRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const layoutRef = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -55,9 +76,6 @@ export function useFinancialGraph(
 
   const [rfNodes, setRfNodes, onRfNodesChange] = useNodesState<NodeRfData>([]);
   const [rfEdges, setRfEdges, onRfEdgesChange] = useEdgesState<EdgeRfData>([]);
-
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   const nodeMap = useMemo(() => {
     const m = new Map<string, FinancialNodeData>();
@@ -266,27 +284,36 @@ export function useFinancialGraph(
   // ---- Selection handlers ----
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<NodeRfData>) => {
-      setSelectedNodeId((prev) => (prev === node.id ? null : node.id));
-      setSelectedEdgeId(null);
+      const store = useGraphStore.getState();
+      store.setSelectedNodeId(store.selectedNodeId === node.id ? null : node.id);
+      store.setSelectedEdgeId(null);
     },
     []
   );
 
   const handleEdgeClick = useCallback(
     (_: React.MouseEvent, edge: Edge<EdgeRfData>) => {
-      setSelectedEdgeId(edge.id);
-      setSelectedNodeId(null);
+      useGraphStore.getState().setSelectedEdgeId(edge.id);
+      useGraphStore.getState().setSelectedNodeId(null);
     },
     []
   );
 
   const handlePaneClick = useCallback(() => {
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
+    useGraphStore.getState().setSelectedNodeId(null);
+    useGraphStore.getState().setSelectedEdgeId(null);
   }, []);
 
   const deselectNode = useCallback(() => {
-    setSelectedNodeId(null);
+    useGraphStore.getState().setSelectedNodeId(null);
+  }, []);
+
+  const setSelectedNodeId = useCallback((id: string | null) => {
+    useGraphStore.getState().setSelectedNodeId(id);
+  }, []);
+
+  const setSelectedEdgeId = useCallback((id: string | null) => {
+    useGraphStore.getState().setSelectedEdgeId(id);
   }, []);
 
   // ---- CRUD ----
@@ -303,19 +330,20 @@ export function useFinancialGraph(
     ) => {
       const id = `node-${Date.now()}`;
       const newNode: FinancialNodeData = { id, ...data };
-      const newFlows: FinancialFlowData[] = connections.map((c, i) => ({
-        id: `flow-${id}-${i}-${Date.now()}`,
-        source: c.direction === "to" ? id : c.targetId,
-        target: c.direction === "to" ? c.targetId : id,
-        amount: c.amount,
-        frequency: c.frequency,
-      }));
       if (initialPosition) {
         pinnedRef.current.set(id, initialPosition);
         layoutRef.current.set(id, initialPosition);
       }
-      setFinancialNodes((prev) => [...prev, newNode]);
-      setFinancialFlows((prev) => [...prev, ...newFlows]);
+      useGraphStore.getState().addNode(newNode);
+      connections.forEach((c, i) => {
+        useGraphStore.getState().addEdge({
+          id: `flow-${id}-${i}-${Date.now()}`,
+          source: c.direction === "to" ? id : c.targetId,
+          target: c.direction === "to" ? c.targetId : id,
+          amount: c.amount,
+          frequency: c.frequency,
+        });
+      });
       return id;
     },
     []
@@ -323,9 +351,7 @@ export function useFinancialGraph(
 
   const updateNode = useCallback(
     (id: string, updates: Partial<Omit<FinancialNodeData, "id">>) => {
-      setFinancialNodes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...updates } : n))
-      );
+      useGraphStore.getState().updateNode(id, updates);
     },
     []
   );
@@ -358,44 +384,36 @@ export function useFinancialGraph(
   const deleteNode = useCallback(
     (nodeId: string) => {
       pinnedRef.current.delete(nodeId);
-      setFinancialNodes((prev) => prev.filter((n) => n.id !== nodeId));
-      setFinancialFlows((prev) =>
-        prev.filter((f) => f.source !== nodeId && f.target !== nodeId)
-      );
-      if (selectedNodeId === nodeId) setSelectedNodeId(null);
+      useGraphStore.getState().deleteNode(nodeId);
     },
-    [selectedNodeId]
+    []
   );
 
   const bulkAdd = useCallback(
     (newNodes: FinancialNodeData[], newFlows: FinancialFlowData[]) => {
-      setFinancialNodes((prev) => [...prev, ...newNodes]);
-      setFinancialFlows((prev) => [...prev, ...newFlows]);
+      useGraphStore.getState().bulkAdd(newNodes, newFlows);
     },
     []
   );
 
   const addFlow = useCallback((flow: Omit<FinancialFlowData, "id">) => {
     const id = `flow-${Date.now()}`;
-    setFinancialFlows((prev) => [...prev, { id, ...flow }]);
+    useGraphStore.getState().addEdge({ id, ...flow });
     return id;
   }, []);
 
   const updateFlow = useCallback(
     (flowId: string, updates: Partial<Omit<FinancialFlowData, "id">>) => {
-      setFinancialFlows((prev) =>
-        prev.map((f) => (f.id === flowId ? { ...f, ...updates } : f))
-      );
+      useGraphStore.getState().updateEdge(flowId, updates);
     },
     []
   );
 
   const deleteFlow = useCallback(
     (flowId: string) => {
-      setFinancialFlows((prev) => prev.filter((f) => f.id !== flowId));
-      if (selectedEdgeId === flowId) setSelectedEdgeId(null);
+      useGraphStore.getState().deleteEdge(flowId);
     },
-    [selectedEdgeId]
+    []
   );
 
   // ---- Derived data ----

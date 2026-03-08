@@ -16,7 +16,7 @@ import type {
 // ────────────────────────────────────────────────────────────────────────────
 
 type AgentType = "sentinel" | "simulator" | "planner";
-type SidebarTab = "dashboard" | "agents" | "financials";
+type SidebarTab = "dashboard" | "agents";
 
 type FormNodeType = "income" | "debt" | "investment" | "savings" | "expense" | "buffer";
 const FORM_TYPE_MAP: Record<FormNodeType, FinancialNodeType> = {
@@ -250,7 +250,7 @@ export function AppSidebar({
           className="flex shrink-0"
           style={{ borderBottom: "1px solid #1a1a2e" }}
         >
-          {(["dashboard", "agents", "financials"] as SidebarTab[]).map(
+          {(["dashboard", "agents"] as SidebarTab[]).map(
             (tab) => (
               <button
                 key={tab}
@@ -298,16 +298,6 @@ export function AppSidebar({
           {activeTab === "agents" && (
             <div key="agents" className="sidebar-fade-in px-4 pb-4">
               <AgentsContent onOpenAgentChat={onOpenAgentChat} />
-            </div>
-          )}
-          {activeTab === "financials" && (
-            <div key="financials" className="sidebar-fade-in px-4 pb-4">
-              <FinancialsContent
-                financialNodes={financialNodes}
-                onAddNodeDirect={onAddNodeDirect}
-                onCsvImportDirect={onCsvImportDirect}
-                onParsedCsvMerge={onParsedCsvMerge}
-              />
             </div>
           )}
         </div>
@@ -831,11 +821,14 @@ export function FinancialsContent({
   onAddNodeDirect,
   onCsvImportDirect: _onCsvImportDirect,
   onParsedCsvMerge,
+  variant = "sidebar",
 }: {
   financialNodes: FinancialNodeData[];
   onAddNodeDirect?: SidebarProps["onAddNodeDirect"];
   onCsvImportDirect?: SidebarProps["onCsvImportDirect"];
   onParsedCsvMerge?: SidebarProps["onParsedCsvMerge"];
+  /** "onboarding" hides Add Manually and shows file-agnostic drag copy */
+  variant?: "sidebar" | "onboarding";
 }) {
   return (
     <>
@@ -850,14 +843,16 @@ export function FinancialsContent({
 
       <Divider />
 
-      {/* CSV IMPORT */}
+      {/* FILE / CSV IMPORT */}
       <div className="py-3">
-        <SectionLabel>Import CSV</SectionLabel>
+        <SectionLabel>{variant === "onboarding" ? "Import file" : "Import CSV"}</SectionLabel>
         <CsvImportZone
           financialNodes={_financialNodes}
           onCsvImportDirect={_onCsvImportDirect}
           onParsedCsvMerge={onParsedCsvMerge}
+          variant={variant}
         />
+        {variant === "sidebar" && (
         <div className="mt-3">
           <p
             className="font-sans"
@@ -885,8 +880,21 @@ export function FinancialsContent({
             ))}
           </div>
         </div>
+        )}
+        {variant === "onboarding" && (
+        <div className="mt-3">
+          <p
+            className="font-sans"
+            style={{ fontWeight: 500, fontSize: 11, color: "#3a3a5a" }}
+          >
+            The file can be anything — bank export, spreadsheet, or transaction list. We'll detect the format and pull in what we can.
+          </p>
+        </div>
+        )}
       </div>
 
+      {variant === "sidebar" && (
+      <>
       <Divider />
 
       {/* ADD MANUALLY */}
@@ -894,6 +902,8 @@ export function FinancialsContent({
         <SectionLabel>Add Manually</SectionLabel>
         <AddNodeForm onAddNodeDirect={onAddNodeDirect} />
       </div>
+      </>
+      )}
     </>
   );
 }
@@ -908,10 +918,12 @@ function CsvImportZone({
   financialNodes: _financialNodes,
   onCsvImportDirect: _onCsvImportDirect,
   onParsedCsvMerge,
+  variant = "sidebar",
 }: {
   financialNodes: FinancialNodeData[];
   onCsvImportDirect?: SidebarProps["onCsvImportDirect"];
   onParsedCsvMerge?: SidebarProps["onParsedCsvMerge"];
+  variant?: "sidebar" | "onboarding";
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -1035,7 +1047,7 @@ function CsvImportZone({
           >
             <ArrowUp style={{ width: 20, height: 20, color: "#3a3a5a" }} />
             <span className="font-sans" style={{ fontWeight: 600, fontSize: 13, color: "#6b6b9a" }}>
-              Drag your bank CSV here
+              {variant === "onboarding" ? "Drag file here" : "Drag your bank CSV here"}
             </span>
             <span className="font-sans" style={{ fontWeight: 500, fontSize: 12, color: "#3a3a5a" }}>
               or click to browse

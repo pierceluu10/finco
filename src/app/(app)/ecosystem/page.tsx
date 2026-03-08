@@ -6,6 +6,7 @@ import Image from "next/image";
 import { demoNodes, demoEdges } from "@/lib/demo-data";
 import { fromDemoData } from "@/lib/graph-transforms";
 import { useFinancialGraph } from "@/hooks/use-financial-graph";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { ThreeGraph } from "@/components/graph/three-graph";
@@ -39,6 +40,7 @@ const seedData = fromDemoData(demoNodes, demoEdges);
 
 function EcosystemDashboard() {
   const graph = useFinancialGraph(seedData.nodes, seedData.flows);
+  const stats = useDashboardStats();
 
   // ── Merge onboarding data from sessionStorage (after signup → onboarding → continue) ──
   useEffect(() => {
@@ -476,10 +478,10 @@ Return only a JSON object with these four fields. No explanation. No markdown.`,
         }}
       >
         <AppSidebar
-          totalIncome={graph.totalIncome}
-          totalExpenses={graph.totalExpenses}
-          nodeCount={graph.financialNodes.length}
-          flowCount={graph.financialFlows.length}
+          totalIncome={stats.totalIncome}
+          totalExpenses={stats.totalExpenses}
+          nodeCount={stats.nodeCount}
+          flowCount={stats.flowCount}
           financialNodes={graph.financialNodes}
           financialFlows={graph.financialFlows}
           collapsed={sidebarCollapsed}
