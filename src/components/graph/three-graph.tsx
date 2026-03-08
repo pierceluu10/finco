@@ -184,7 +184,7 @@ export function ThreeGraph({
   simulationOriginalNodes = null,
   onEnterSimulation,
   onSimulationChange,
-  onSimulationRelease,
+  onSimulationRelease: _onSimulationRelease,
   onSimulationDiscard,
   onSimulationApply,
   simulationJustApplied = false,

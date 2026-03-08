@@ -94,7 +94,7 @@ function EcosystemDashboard() {
       setTimeout(() => setIntroDone(true), INTRO_OVERLAY_END_MS + 2300),
     ];
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [INTRO_SHOW_MS, INTRO_OVERLAY_END_MS]);
 
   // ── Dialogs ──
   const [addDialogOpen, setAddDialogOpen] = useState(false);

@@ -82,7 +82,7 @@ export function SimulationGraph({
   viewMode,
   changedNodeId = null,
   changedNodeDirection = null,
-  impactedNodeIds,
+  impactedNodeIds: _impactedNodeIds,
   pulseNodeId = null,
   brightEdgeIds = new Set(),
 }: SimulationGraphProps) {
