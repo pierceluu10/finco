@@ -91,7 +91,10 @@ export function OnboardingPage({
     []
   );
 
+  const canContinue = firstName.trim().length > 0 && priorityNote.trim().length > 0;
+
   const handleContinue = useCallback(() => {
+    if (!canContinue) return;
     try {
       sessionStorage.setItem(
         ONBOARDING_STORAGE_KEY,
@@ -109,7 +112,7 @@ export function OnboardingPage({
       /* noop */
     }
     router.push("/ecosystem");
-  }, [onboardingNodes, onboardingFlows, firstName, lastName, priorityNote, router]);
+  }, [canContinue, onboardingNodes, onboardingFlows, firstName, lastName, priorityNote, router]);
 
   const addedCount = onboardingNodes.length;
 
@@ -123,7 +126,8 @@ export function OnboardingPage({
         <button
           type="button"
           onClick={handleContinue}
-          className="font-sans inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#7F7FFA] px-6 font-bold text-black transition-all hover:bg-[#7F7FFA]/90"
+          disabled={!canContinue}
+          className="font-sans inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#7F7FFA] px-6 font-bold text-black transition-all hover:bg-[#7F7FFA]/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#7F7FFA]"
           style={{ fontSize: 13 }}
         >
           Continue to Ecosystem
@@ -164,6 +168,7 @@ export function OnboardingPage({
                 value={firstName}
                 onChange={setFirstName}
                 placeholder="First name"
+                required
               />
               <InputField
                 id="lastName"
@@ -181,7 +186,6 @@ export function OnboardingPage({
                 label="Email"
                 value={user.email ?? ""}
                 readOnly
-                hint="From your account — not editable here."
               />
             </div>
 
@@ -193,6 +197,7 @@ export function OnboardingPage({
                 value={priorityNote}
                 onChange={setPriorityNote}
                 placeholder="e.g. Save for a down payment, pay off credit card, build emergency fund"
+                required
               />
             </div>
 
@@ -287,6 +292,7 @@ function InputField({
   placeholder,
   readOnly,
   hint,
+  required,
 }: {
   id: string;
   label: string;
@@ -295,6 +301,7 @@ function InputField({
   placeholder?: string;
   readOnly?: boolean;
   hint?: string;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -304,6 +311,7 @@ function InputField({
         style={{ fontWeight: 600, fontSize: 12, color: "#6b6b9a" }}
       >
         {label}
+        {required && <span style={{ color: "#7F7FFA", marginLeft: 2 }}>*</span>}
       </label>
       <input
         id={id}
@@ -312,6 +320,7 @@ function InputField({
         onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         readOnly={readOnly}
         placeholder={placeholder}
+        required={required}
         className={`font-sans w-full rounded-lg border bg-[#0a0a14] px-3 py-2.5 outline-none transition placeholder:text-[#3a3a5a] focus:border-[#7F7FFA]/40 ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
         style={{ borderColor: "#1a1a2e", color: readOnly ? "#6b6b9a" : "#e8e8ff", fontSize: 14 }}
       />
