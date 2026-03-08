@@ -1,21 +1,10 @@
 import type { Metadata } from "next";
-import { Manrope, Poppins, JetBrains_Mono } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
-});
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-poppins",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${manrope.variable} ${poppins.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${manrope.variable} font-sans antialiased`}
       >
         {children}
       </body>

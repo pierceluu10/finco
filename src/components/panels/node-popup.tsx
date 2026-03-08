@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useReactFlow } from "reactflow";
 import { X, Send, Loader2 } from "lucide-react";
 import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
 import { getNodeColor } from "@/lib/graph-theme";
@@ -12,6 +11,10 @@ interface NodePopupProps {
   connectedFlows: FinancialFlowData[];
   nodeMap: Map<string, FinancialNodeData>;
   onClose: () => void;
+  anchorX: number;
+  anchorY: number;
+  containerWidth: number;
+  containerHeight: number;
 }
 
 function serializeNodeContext(
@@ -37,9 +40,16 @@ function serializeNodeContext(
   return lines.join("\n");
 }
 
-export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupProps) {
-  const { getViewport } = useReactFlow();
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+export function NodePopup({
+  node,
+  connectedFlows,
+  nodeMap,
+  onClose,
+  anchorX,
+  anchorY,
+  containerWidth,
+  containerHeight,
+}: NodePopupProps) {
   const [visible, setVisible] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatResponse, setChatResponse] = useState<string | null>(null);
@@ -52,41 +62,18 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
   const outbound = connectedFlows.filter((f) => f.source === node.id);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const rfNodes = document.querySelectorAll<HTMLElement>(`[data-id="${node.id}"]`);
-      if (rfNodes.length > 0) {
-        const rect = rfNodes[0].getBoundingClientRect();
-        const container = rfNodes[0].closest(".react-flow");
-        if (container) {
-          const cRect = container.getBoundingClientRect();
-          const nodeCenterX = rect.left - cRect.left + rect.width / 2;
-          const nodeCenterY = rect.top - cRect.top + rect.height;
-          setPos({ x: nodeCenterX, y: nodeCenterY + 12 });
-        }
-      }
-      setVisible(true);
-    }, 420);
+    const timer = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(timer);
-  }, [node.id, getViewport]);
+  }, []);
 
-  const clampPosition = useCallback(() => {
-    if (!pos || !popupRef.current) return pos;
-    const popup = popupRef.current;
-    const parent = popup.parentElement;
-    if (!parent) return pos;
-    const pRect = parent.getBoundingClientRect();
-    const popW = 300;
-    const popH = popup.offsetHeight;
-    let x = pos.x - popW / 2;
-    let y = pos.y;
-    if (x < 8) x = 8;
-    if (x + popW > pRect.width - 8) x = pRect.width - popW - 8;
-    if (y + popH > pRect.height - 8) y = pos.y - popH - 40;
-    if (y < 8) y = 8;
-    return { x, y };
-  }, [pos]);
-
-  const clamped = clampPosition();
+  const popW = 300;
+  const popH = 400;
+  let x = anchorX + 20;
+  let y = anchorY - popH / 2;
+  if (x + popW > containerWidth - 12) x = anchorX - popW - 20;
+  if (y < 12) y = 12;
+  if (y + popH > containerHeight - 12) y = containerHeight - popH - 12;
+  if (x < 12) x = 12;
 
   const sendChat = useCallback(async () => {
     const msg = chatInput.trim();
@@ -111,16 +98,14 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
     }
   }, [chatInput, chatLoading, node, connectedFlows, nodeMap]);
 
-  if (!pos || !clamped) return null;
-
   return (
     <div
       ref={popupRef}
       className="absolute z-50 font-sans"
       style={{
-        left: clamped.x,
-        top: clamped.y,
-        width: 300,
+        left: x,
+        top: y,
+        width: popW,
         opacity: visible ? 1 : 0,
         transform: visible ? "scale(1)" : "scale(0.95)",
         transition: "opacity 0.25s ease, transform 0.25s ease",
@@ -138,7 +123,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
           overflow: "hidden",
         }}
       >
-        {/* SECTION 1 — Header */}
+        {/* Header */}
         <div className="px-4 pt-4 pb-3 relative">
           <button
             onClick={onClose}
@@ -158,7 +143,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
               {node.type}
             </span>
           </div>
-          <span className="font-mono font-bold text-[22px]" style={{ color: "#e8e8ff" }}>
+          <span className="font-bold text-[22px]" style={{ color: "#e8e8ff", fontFamily: "'Manrope', sans-serif" }}>
             {formatCurrency(node.currentValue > 0 ? node.currentValue : node.monthlyFlow)}
             {node.currentValue <= 0 && node.monthlyFlow > 0 && (
               <span className="font-sans text-[13px] font-medium" style={{ color: "#6b6b9a" }}>/mo</span>
@@ -168,7 +153,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
 
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
-        {/* SECTION 3 — Flows */}
+        {/* Flows */}
         <div className="px-4 py-3">
           <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Flows
@@ -188,7 +173,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
                   </span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="font-mono text-[13px]" style={{ color: "#4ade80" }}>
+                  <span className="text-[13px]" style={{ color: "#4ade80", fontFamily: "'Manrope', sans-serif" }}>
                     {formatCurrency(f.amount)}
                   </span>
                   <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
@@ -206,7 +191,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
                   </span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="font-mono text-[13px]" style={{ color: "#f87171" }}>
+                  <span className="text-[13px]" style={{ color: "#f87171", fontFamily: "'Manrope', sans-serif" }}>
                     {formatCurrency(f.amount)}
                   </span>
                   <span className="font-sans text-[10px]" style={{ color: "#6b6b9a" }}>
@@ -220,7 +205,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
 
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
-        {/* SECTION 5 — Metadata */}
+        {/* Metadata */}
         {Object.keys(node.metadata).length > 0 && (
           <>
             <div className="px-4 py-3 space-y-1.5">
@@ -233,7 +218,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
                       {key.replace(/_/g, " ")}
                     </span>
                     <span
-                      className={`${isNumeric ? "font-mono" : "font-sans"} text-right truncate max-w-[140px] text-[12px]`}
+                      className={`${isNumeric ? "tabular-nums" : ""} text-right truncate max-w-[140px] text-[12px] font-sans`}
                       style={{ color: "#e8e8ff" }}
                     >
                       {strVal}
@@ -246,7 +231,7 @@ export function NodePopup({ node, connectedFlows, nodeMap, onClose }: NodePopupP
           </>
         )}
 
-        {/* SECTION 7 — Agent Chat */}
+        {/* Agent Chat */}
         <div className="px-4 py-3">
           <p className="font-sans font-bold text-[11px] uppercase tracking-[0.1em] mb-2" style={{ color: "#6b6b9a" }}>
             Ask Librarian

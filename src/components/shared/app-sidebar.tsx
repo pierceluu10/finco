@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Settings, LogOut, Upload as UploadIcon, ArrowUp } from "lucide-react";
+import { User, LogOut, Upload as UploadIcon, ArrowUp } from "lucide-react";
 import { FincoLogo } from "./logo";
 import { formatCurrency } from "@/lib/utils";
 import { type CsvImportResult } from "@/lib/csv-import";
@@ -189,7 +189,7 @@ export function AppSidebar({
   const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
 
   const outerStyle: React.CSSProperties = {
-    width: collapsed ? 0 : "33.333vw",
+    width: collapsed ? 0 : "25vw",
     transition: `width ${TRANSITION}`,
     ...introStyle,
   };
@@ -297,11 +297,11 @@ export function AppSidebar({
         {/* Footer */}
         <div className="shrink-0 border-t border-white/5 p-2 space-y-0.5">
           <Link
-            href="#"
+            href="/profile"
             className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-white/5 hover:text-zinc-300 transition font-sans"
           >
-            <Settings className="h-3 w-3" />
-            Settings
+            <User className="h-3 w-3" />
+            My Profile
           </Link>
           <a
             href="/auth/logout"
@@ -515,7 +515,7 @@ function DashboardContent({
                 />
               </div>
               <span
-                className="font-mono shrink-0"
+                className="font-sans shrink-0 tabular-nums"
                 style={{ fontSize: 12, color: "#e8e8ff" }}
               >
                 {formatCurrency(n.monthlyFlow)}
@@ -547,7 +547,7 @@ function DashboardContent({
       <div className="py-3">
         <SectionLabel>Net Worth</SectionLabel>
         <p
-          className="font-mono mt-1"
+          className="font-sans mt-1 tabular-nums"
           style={{ fontWeight: 700, fontSize: 28, color: "#e8e8ff" }}
         >
           {formatCurrency(netWorth)}
@@ -608,7 +608,7 @@ function DashboardContent({
                   </span>
                 </div>
                 <span
-                  className="font-mono shrink-0"
+                  className="font-sans shrink-0 tabular-nums"
                   style={{ fontSize: 13, color: "#e8e8ff" }}
                 >
                   {formatCurrency(p.amount)}
@@ -794,7 +794,7 @@ function AgentCard({
             Active Alerts
           </span>
           <span
-            className="font-mono rounded-full px-2 py-0.5"
+            className="font-sans rounded-full px-2 py-0.5 tabular-nums"
             style={{
               fontWeight: 700,
               fontSize: 11,
@@ -1190,7 +1190,7 @@ function CsvImportZone({
                 <span className="font-sans" style={{ fontWeight: 500, fontSize: 11, color: "#6b6b9a" }}>
                   Income
                 </span>
-                <p className="font-mono" style={{ fontWeight: 700, fontSize: 14, color: "#4ade80" }}>
+                <p className="font-sans tabular-nums" style={{ fontWeight: 700, fontSize: 14, color: "#4ade80" }}>
                   {fmtCurrency(summary.totalIncome)}
                 </p>
               </div>
@@ -1198,7 +1198,7 @@ function CsvImportZone({
                 <span className="font-sans" style={{ fontWeight: 500, fontSize: 11, color: "#6b6b9a" }}>
                   Expenses
                 </span>
-                <p className="font-mono" style={{ fontWeight: 700, fontSize: 14, color: "#ff4d6d" }}>
+                <p className="font-sans tabular-nums" style={{ fontWeight: 700, fontSize: 14, color: "#ff4d6d" }}>
                   {fmtCurrency(summary.totalExpenses)}
                 </p>
               </div>
@@ -1657,13 +1657,13 @@ function MonthlyTrendChart() {
           </p>
           <p>
             <span style={{ color: "rgba(0,255,136,0.8)" }}>Income:</span>{" "}
-            <span className="font-mono">
+            <span className="font-sans tabular-nums">
               {formatCurrency(data[hovered].income)}
             </span>
           </p>
           <p>
             <span style={{ color: "rgba(255,77,109,0.7)" }}>Expenses:</span>{" "}
-            <span className="font-mono">
+            <span className="font-sans tabular-nums">
               {formatCurrency(data[hovered].expenses)}
             </span>
           </p>
@@ -1715,7 +1715,7 @@ function SavingsRateRing({ rate }: { rate: number }) {
           y="50%"
           textAnchor="middle"
           dominantBaseline="central"
-          className="font-mono"
+          className="font-sans tabular-nums"
           style={{ fontSize: 18, fontWeight: 700, fill: "#e8e8ff" }}
         >
           {rate}%
@@ -1802,7 +1802,7 @@ function FormField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`font-sans w-full outline-none ${type === "number" ? "font-mono" : ""}`}
+        className={`font-sans w-full outline-none ${type === "number" ? "tabular-nums" : ""}`}
         style={{
           background: "#050508",
           border: "1px solid #1a1a2e",
@@ -1905,7 +1905,7 @@ function StatRow({
   return (
     <div className="flex justify-between items-baseline">
       <span className="font-sans text-[11px] text-zinc-500">{label}</span>
-      <span className={`text-xs font-mono ${accent ?? "text-zinc-200"}`}>
+      <span className={`text-xs font-sans tabular-nums ${accent ?? "text-zinc-200"}`}>
         {value}
       </span>
     </div>
@@ -1929,7 +1929,7 @@ function FlowStat({
       >
         {label}
       </p>
-      <p className="font-mono" style={{ fontSize: 13, color }}>
+      <p className="font-sans tabular-nums" style={{ fontSize: 13, color }}>
         {value}
       </p>
     </div>
@@ -1947,7 +1947,7 @@ function StatBox({ label, value }: { label: string; value: number }) {
       }}
     >
       <p
-        className="font-mono"
+        className="font-sans tabular-nums"
         style={{ fontWeight: 700, fontSize: 24, color: "#e8e8ff" }}
       >
         {value}

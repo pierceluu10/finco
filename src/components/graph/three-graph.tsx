@@ -3,92 +3,64 @@
 import {
   useRef,
   useState,
-  useCallback,
   useEffect,
   useMemo,
+  useCallback,
 } from "react";
-import * as THREE from "three";
-import type {
-  FinancialNodeData,
-  FinancialFlowData,
-  FinancialNodeType,
-} from "@/types/graph";
-import { getNodeColor, NODE_COLORS } from "@/lib/graph-theme";
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCollide,
+  forceCenter,
+  forceX,
+  forceY,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
+  type Simulation,
+} from "d3-force";
+import type { FinancialNodeType, FinancialNodeData, FinancialFlowData } from "@/types/graph";
+import { getNodeColor, HEALTH_POS, HEALTH_NEG } from "@/lib/graph-theme";
 import { formatCurrency } from "@/lib/utils";
+import { NodePopup } from "@/components/panels/node-popup";
+import Image from "next/image";
+import { Workflow } from "lucide-react";
 
-// ── Constants ──
+/* ── Types ── */
 
-const POS_SCALE = 100;
-const RAD_MULT = 1.4;
-const CANVAS_W = 1800;
-const CANVAS_H = 1200;
-const AUTO_ROTATE_SPEED = 0.0008;
-const BURST_EASE = 0.06;
-
-const HEALTH_POS: Record<string, string> = {
-  income: "#00ff88",
-  savings: "#00ff88",
-  investment: "#00ff88",
-};
-const HEALTH_NEG: Record<string, string> = {
-  expense: "#ff4d6d",
-  debt: "#ff4d6d",
-};
-
-type LabelMode = "none" | "important" | "all";
-
-// ── Types ──
-
-interface NodeMesh {
+interface SimNode extends SimulationNodeDatum {
   id: string;
-  type: FinancialNodeType;
+  radius: number;
+}
+
+interface NodeView {
+  id: string;
   label: string;
+  type: FinancialNodeType;
   amount: number;
-  radius3d: number;
-  target: THREE.Vector3;
-  current: THREE.Vector3;
-  sphere: THREE.Mesh;
-  glow: THREE.Sprite;
-  ring: THREE.Mesh;
-  origColor: THREE.Color;
-  healthColor: THREE.Color;
-  burstDelay: number;
-  burstStarted: boolean;
+  radius: number;
+  color: string;
+  x: number;
+  y: number;
 }
-
-interface EdgeMesh {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  amount: number;
-  outerTube: THREE.Mesh;
-  innerTube: THREE.Mesh;
-}
-
-interface Particle {
-  mesh: THREE.Mesh;
-  t: number;
-  speed: number;
-  edgeIdx: number;
-}
-
-// ── Props ──
 
 export interface ThreeGraphProps {
-  rfNodes: Array<{
+  rfNodes: unknown[];
+  financialNodes: Array<{
     id: string;
-    position: { x: number; y: number };
-    data: {
-      radius: number;
-      color: string;
-      label: string;
-      type: FinancialNodeType;
-      currentValue: number;
-      monthlyFlow: number;
-    };
+    label: string;
+    type: FinancialNodeType;
+    currentValue: number;
+    monthlyFlow: number;
+    metadata: Record<string, unknown>;
   }>;
-  financialNodes: FinancialNodeData[];
-  financialFlows: FinancialFlowData[];
+  financialFlows: Array<{
+    id: string;
+    source: string;
+    target: string;
+    amount: number;
+    frequency: string;
+  }>;
   nodeMap: Map<string, FinancialNodeData>;
   selectedNodeId: string | null;
   connectedNodeIds: Set<string>;
@@ -98,791 +70,704 @@ export interface ThreeGraphProps {
   interactionEnabled: boolean;
 }
 
-// ── Helpers ──
+/* ── Helpers ── */
 
-function to3D(
-  px: number,
-  py: number,
-  seedZ: number
-): THREE.Vector3 {
-  return new THREE.Vector3(
-    (px - CANVAS_W / 2) / POS_SCALE,
-    -(py - CANVAS_H / 2) / POS_SCALE,
-    seedZ
-  );
+function quadBezierPoint(
+  sx: number, sy: number,
+  cx: number, cy: number,
+  ex: number, ey: number,
+  t: number,
+): { x: number; y: number } {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * sx + 2 * mt * t * cx + t * t * ex,
+    y: mt * mt * sy + 2 * mt * t * cy + t * t * ey,
+  };
 }
 
-function getHealthColor(type: FinancialNodeType, hasOutbound: boolean): string {
-  if (HEALTH_POS[type]) return HEALTH_POS[type];
-  if (HEALTH_NEG[type]) return HEALTH_NEG[type];
-  // account (buffer)
-  return hasOutbound ? "#00ff88" : "#ffe040";
+/* ── Particle state ── */
+
+interface Particle {
+  flowId: string;
+  t: number;
+  speed: number;
+  isIncome: boolean; // green if true, red if false
 }
 
-function makeGlowTexture(): THREE.Texture {
-  const size = 128;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, "rgba(255,255,255,0.5)");
-  g.addColorStop(0.3, "rgba(255,255,255,0.15)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(canvas);
-  return tex;
+/* ── Constants ── */
+
+const NODE_PAD = 48; // spacing between nodes to minimize overlap
+const LAYOUT_RADIUS_X = 440; // wider horizontal spread (left–right)
+const LAYOUT_RADIUS_Y = 240; // slightly tighter vertically to use horizontal space
+
+/** Deterministic "random" from string seed — same layout every time */
+function seededPosition(id: string, index: number): { x: number; y: number } {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h << 5) - h + id.charCodeAt(i) | 0;
+  const angle = (Math.abs(h) % 1000) / 1000 * Math.PI * 2 + (index * 0.618);
+  const r = 0.3 + (Math.abs((h >> 8) % 1000) / 1000) * 0.7; // 0.3–1.0 of radius
+  return {
+    x: Math.cos(angle) * LAYOUT_RADIUS_X * r,
+    y: Math.sin(angle) * LAYOUT_RADIUS_Y * r,
+  };
 }
 
-function curveBetween(
-  a: THREE.Vector3,
-  b: THREE.Vector3
-): THREE.QuadraticBezierCurve3 {
-  const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
-  const dir = new THREE.Vector3().subVectors(b, a);
-  const len = dir.length();
-  dir.normalize();
-  const perp = new THREE.Vector3(-dir.y, dir.x, 0).normalize();
-  const ctrl = mid.clone().add(perp.multiplyScalar(len * 0.15)).add(new THREE.Vector3(0, 0, len * 0.08));
-  return new THREE.QuadraticBezierCurve3(a.clone(), ctrl, b.clone());
-}
-
-function rebuildTube(
-  curve: THREE.QuadraticBezierCurve3,
-  radius: number,
-  segments: number,
-  radialSeg: number
-): THREE.TubeGeometry {
-  return new THREE.TubeGeometry(curve, segments, radius, radialSeg, false);
-}
-
-// ── Component ──
+/* ── Component ── */
 
 export function ThreeGraph({
-  rfNodes,
   financialNodes,
   financialFlows,
   nodeMap,
-  selectedNodeId,
-  connectedNodeIds,
   onSelectNode,
   onDeselectNode,
-  burstActive,
-  interactionEnabled,
 }: ThreeGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [labelMode, setLabelMode] = useState<LabelMode>("none");
-  const [healthView, setHealthView] = useState(false);
+  const simRef = useRef<Simulation<SimNode, SimulationLinkDatum<SimNode>> | null>(null);
+  const simNodesRef = useRef<SimNode[]>([]);
 
-  // Three.js refs
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const groupRef = useRef<THREE.Group | null>(null);
-  const nodesRef = useRef<NodeMesh[]>([]);
-  const edgesRef = useRef<EdgeMesh[]>([]);
+  const [nodes, setNodes] = useState<NodeView[]>([]);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [flowView, setFlowView] = useState(false);
+  const [size, setSize] = useState({ w: 1000, h: 700 });
+
+  // Drag state refs (not React state to avoid re-renders per frame)
+  const draggingRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const didDragRef = useRef(false);
+  const zoomParamsRef = useRef<{ tx: number; ty: number; scale: number } | null>(null);
+
+  // Particles ref (managed imperatively for performance)
   const particlesRef = useRef<Particle[]>([]);
-  const rafRef = useRef(0);
-  const clockRef = useRef(new THREE.Clock());
-  const glowTexRef = useRef<THREE.Texture | null>(null);
-  const labelsContainerRef = useRef<HTMLDivElement>(null);
-  const markersContainerRef = useRef<HTMLDivElement>(null);
 
-  // Burst state
-  const burstStartRef = useRef(0);
-  const burstDoneRef = useRef(false);
-  const burstFrozenRef = useRef(false);
-
-  // Health transition
-  const healthTransRef = useRef({
-    transitioning: false,
-    startTime: 0,
-    toHealth: false,
-    duration: 400,
-  });
-
-  // Camera burst offset
-  const camTargetZ = useRef(20);
-  const camCurrentZ = useRef(22);
-
-  // Track props with refs for animation loop
-  const selectedRef = useRef(selectedNodeId);
-  const connectedRef = useRef(connectedNodeIds);
-  const healthRef = useRef(healthView);
-  const labelModeRef = useRef(labelMode);
-  const interactRef = useRef(interactionEnabled);
-  selectedRef.current = selectedNodeId;
-  connectedRef.current = connectedNodeIds;
-  healthRef.current = healthView;
-  labelModeRef.current = labelMode;
-  interactRef.current = interactionEnabled;
-
-  // Outbound set for health view (account nodes)
-  const outboundSet = useMemo(() => {
+  // Connected node set for hover/selection highlighting
+  const connectedSet = useMemo(() => {
+    const activeId = selectedId ?? hoveredId;
+    if (!activeId) return new Set<string>();
     const s = new Set<string>();
-    for (const f of financialFlows) s.add(f.source);
+    s.add(activeId);
+    for (const f of financialFlows) {
+      if (f.source === activeId) s.add(f.target);
+      if (f.target === activeId) s.add(f.source);
+    }
     return s;
-  }, [financialFlows]);
+  }, [hoveredId, selectedId, financialFlows]);
 
-  const maxEdgeAmount = useMemo(
-    () => Math.max(1, ...financialFlows.map((f) => f.amount)),
-    [financialFlows]
-  );
+  // Flows connected to selected/hovered node
+  const connectedFlows = useMemo(() => {
+    if (!selectedId) return [];
+    return financialFlows.filter(
+      (f) => f.source === selectedId || f.target === selectedId
+    ) as FinancialFlowData[];
+  }, [selectedId, financialFlows]);
 
-  // ── Init scene ──
+  // Zoom state for click-to-zoom
+  const [zoomTarget, setZoomTarget] = useState<{ x: number; y: number } | null>(null);
+
+  // Observe container size
   useEffect(() => {
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
-
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setSize({ w: width, h: height });
     });
-    renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x000000, 0);
-    rendererRef.current = renderer;
-
-    // Scene
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 200);
-    camera.position.set(0, 0, 22);
-    camera.lookAt(0, 0, 0);
-    cameraRef.current = camera;
-    camCurrentZ.current = 22;
-    camTargetZ.current = 20;
-
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const pLight = new THREE.PointLight(0x7f7ffa, 1.2, 60);
-    pLight.position.set(5, 8, 15);
-    scene.add(pLight);
-
-    // Group for auto-rotation
-    const group = new THREE.Group();
-    scene.add(group);
-    groupRef.current = group;
-
-    // Glow texture
-    glowTexRef.current = makeGlowTexture();
-
-    // Resize handler
-    const onResize = () => {
-      const nw = container.clientWidth;
-      const nh = container.clientHeight;
-      renderer.setSize(nw, nh);
-      camera.aspect = nw / nh;
-      camera.updateProjectionMatrix();
-    };
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      window.removeEventListener("resize", onResize);
-      cancelAnimationFrame(rafRef.current);
-      renderer.dispose();
-      scene.clear();
-    };
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  // ── Build nodes and edges when rfNodes change ──
+  // Compute radii
+  const radiiMap = useMemo(() => {
+    const weights = financialNodes.map(
+      (n) => Math.max(n.currentValue, n.monthlyFlow) || 1
+    );
+    const minW = Math.min(...weights);
+    const maxW = Math.max(...weights);
+    const sqMin = Math.sqrt(minW);
+    const sqMax = Math.sqrt(maxW);
+    const range = sqMax - sqMin;
+
+    const m = new Map<string, number>();
+    financialNodes.forEach((n, i) => {
+      const sqA = Math.sqrt(weights[i]);
+      const t = range <= 0 ? 0.5 : (sqA - sqMin) / range;
+      m.set(n.id, 20 + t * 28);
+    });
+    return m;
+  }, [financialNodes]);
+
+  // One-time layout: run force simulation to convergence, then stop (no ongoing animation)
   useEffect(() => {
-    const group = groupRef.current;
-    const glowTex = glowTexRef.current;
-    if (!group || !glowTex) return;
+    if (financialNodes.length === 0) return;
 
-    // Clear previous
-    while (group.children.length > 0) group.remove(group.children[0]);
-    nodesRef.current = [];
-    edgesRef.current = [];
-    particlesRef.current = [];
-    burstDoneRef.current = false;
-    burstFrozenRef.current = false;
-    burstStartRef.current = performance.now();
+    const pad = NODE_PAD;
+    const cx = size.w / 2;
+    const cy = size.h / 2;
 
-    // Seed z-offsets deterministically
-    const seedZ = (id: string) => {
-      let h = 0;
-      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-      return ((h % 200) - 100) / 100; // -1 to 1
-    };
+    const simNodes: SimNode[] = financialNodes.map((n, i) => {
+      const radius = radiiMap.get(n.id) ?? 28;
+      const pos = seededPosition(n.id, i);
+      return {
+        id: n.id,
+        radius,
+        x: cx + pos.x,
+        y: cy + pos.y,
+      };
+    });
 
-    // Create node meshes
-    for (let i = 0; i < rfNodes.length; i++) {
-      const rn = rfNodes[i];
-      const r = rn.data.radius;
-      const r3d = (r * RAD_MULT) / POS_SCALE;
-      const centerX = rn.position.x + r;
-      const centerY = rn.position.y + r;
-      const target = to3D(centerX, centerY, seedZ(rn.id));
-      const color = new THREE.Color(rn.data.color);
-      const hc = getHealthColor(rn.data.type, outboundSet.has(rn.id));
-      const healthColor = new THREE.Color(hc);
+    // Build links from financial flows so every edge connects real nodes
+    const flowLinks: SimulationLinkDatum<SimNode>[] = financialFlows.map(
+      (f) => ({ source: f.source, target: f.target })
+    );
+    // Ensure all nodes are in the link graph for layout (connect isolated nodes to first node)
+    const linkedIds = new Set<string>();
+    flowLinks.forEach((l) => {
+      const src = typeof l.source === "object" ? (l.source as SimNode).id : String(l.source);
+      const tgt = typeof l.target === "object" ? (l.target as SimNode).id : String(l.target);
+      linkedIds.add(src);
+      linkedIds.add(tgt);
+    });
+    const allIds = new Set(financialNodes.map((n) => n.id));
+    const firstId = financialNodes[0]?.id;
+    const simLinks: SimulationLinkDatum<SimNode>[] = [...flowLinks];
+    allIds.forEach((id) => {
+      if (!linkedIds.has(id) && firstId) {
+        simLinks.push({ source: id, target: firstId });
+      }
+    });
 
-      // Sphere
-      const geo = new THREE.SphereGeometry(r3d, 32, 32);
-      const mat = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 0.35,
-        roughness: 0.4,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 1,
-      });
-      const sphere = new THREE.Mesh(geo, mat);
-      sphere.userData = { nodeId: rn.id };
+    simRef.current?.stop();
+    const sim = forceSimulation<SimNode>(simNodes)
+      .force(
+        "link",
+        forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
+          .id((d) => d.id)
+          .distance(200)
+          .strength(0.14)
+      )
+      .force("charge", forceManyBody<SimNode>().strength(-580))
+      .force(
+        "collide",
+        forceCollide<SimNode>()
+          .radius((d) => d.radius + pad)
+          .strength(1)
+          .iterations(6)
+      )
+      .force("center", forceCenter(cx, cy).strength(0.1))
+      .force("x", forceX<SimNode>(cx).strength(0.04))
+      .force("y", forceY<SimNode>(cy).strength(0.08))
+      .velocityDecay(0.4)
+      .alphaDecay(0.022)
+      .alpha(0.5);
 
-      // Glow sprite
-      const spriteMat = new THREE.SpriteMaterial({
-        map: glowTex,
-        color,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 0.35,
-      });
-      const glow = new THREE.Sprite(spriteMat);
-      glow.scale.setScalar(r3d * 3.5);
+    simRef.current = sim;
+    simNodesRef.current = simNodes;
 
-      // Selection ring
-      const ringGeo = new THREE.RingGeometry(r3d * 1.15, r3d * 1.25, 48);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.lookAt(0, 0, 1);
-
-      // Position at origin for burst
-      const startPos = new THREE.Vector3(0, 0, 0);
-      sphere.position.copy(startPos);
-      glow.position.copy(startPos);
-      ring.position.copy(startPos);
-
-      group.add(sphere);
-      group.add(glow);
-      group.add(ring);
-
-      nodesRef.current.push({
-        id: rn.id,
-        type: rn.data.type,
-        label: rn.data.label,
-        amount:
-          rn.data.currentValue > 0
-            ? rn.data.currentValue
-            : rn.data.monthlyFlow,
-        radius3d: r3d,
-        target,
-        current: startPos.clone(),
-        sphere,
-        glow,
-        ring,
-        origColor: color.clone(),
-        healthColor,
-        burstDelay: i * 40,
-        burstStarted: false,
-      });
+    // Run until stable for consistent, low-overlap layout
+    for (let i = 0; i < 550; i++) {
+      sim.tick();
+      if (sim.alpha() < 0.001) break;
     }
+    sim.stop();
 
-    // Create edge meshes
-    const nodeById = new Map<string, NodeMesh>();
-    for (const n of nodesRef.current) nodeById.set(n.id, n);
-
-    for (const flow of financialFlows) {
-      const src = nodeById.get(flow.source);
-      const tgt = nodeById.get(flow.target);
-      if (!src || !tgt) continue;
-
-      const curve = curveBetween(src.current, tgt.current);
-
-      // Outer tube
-      const outerGeo = rebuildTube(curve, 0.04, 60, 8);
-      const outerMat = new THREE.MeshBasicMaterial({
-        color: 0x7f7ffa,
-        transparent: true,
-        opacity: 0.55,
-      });
-      const outerTube = new THREE.Mesh(outerGeo, outerMat);
-
-      // Inner tube
-      const innerGeo = rebuildTube(curve, 0.018, 60, 8);
-      const innerMat = new THREE.MeshBasicMaterial({
-        color: 0xa78bfa,
-        transparent: true,
-        opacity: 0.8,
-      });
-      const innerTube = new THREE.Mesh(innerGeo, innerMat);
-
-      group.add(outerTube);
-      group.add(innerTube);
-
-      edgesRef.current.push({
-        id: flow.id,
-        sourceId: flow.source,
-        targetId: flow.target,
-        amount: flow.amount,
-        outerTube,
-        innerTube,
-      });
-
-      // Particles
-      const norm = flow.amount / maxEdgeAmount;
-      const speed = 0.004 + norm * 0.012;
-      const count = Math.round(2 + norm * 6);
-      for (let p = 0; p < count; p++) {
-        const pGeo = new THREE.SphereGeometry(0.09, 8, 8);
-        const pMat = new THREE.MeshBasicMaterial({
-          color: 0x00d4ff,
-          transparent: true,
-          opacity: 0,
-        });
-        const pMesh = new THREE.Mesh(pGeo, pMat);
-        group.add(pMesh);
-        particlesRef.current.push({
-          mesh: pMesh,
-          t: p / count,
-          speed,
-          edgeIdx: edgesRef.current.length - 1,
-        });
-      }
-    }
-
-    // Start animation loop
-    const animate = () => {
-      rafRef.current = requestAnimationFrame(animate);
-
-      const renderer = rendererRef.current;
-      const scene = sceneRef.current;
-      const camera = cameraRef.current;
-      const gp = groupRef.current;
-      if (!renderer || !scene || !camera || !gp) return;
-
-      const now = performance.now();
-      const burst = burstStartRef.current;
-
-      // Auto-rotate
-      gp.rotation.y += AUTO_ROTATE_SPEED;
-
-      // Camera ease
-      camCurrentZ.current += (camTargetZ.current - camCurrentZ.current) * 0.02;
-      camera.position.z = camCurrentZ.current;
-
-      // ── Burst animation ──
-      if (!burstFrozenRef.current) {
-        let allSettled = true;
-        for (const n of nodesRef.current) {
-          const elapsed = now - burst;
-          if (elapsed < n.burstDelay) {
-            allSettled = false;
-            continue;
-          }
-          n.burstStarted = true;
-          n.current.x += (n.target.x - n.current.x) * BURST_EASE;
-          n.current.y += (n.target.y - n.current.y) * BURST_EASE;
-          n.current.z += (n.target.z - n.current.z) * BURST_EASE;
-
-          n.sphere.position.copy(n.current);
-          n.glow.position.copy(n.current);
-          n.ring.position.copy(n.current);
-
-          const dist = n.current.distanceTo(n.target);
-          if (dist > 0.01) allSettled = false;
-        }
-
-        // Rebuild edge geometry during burst
-        const nodeById2 = new Map<string, NodeMesh>();
-        for (const n of nodesRef.current) nodeById2.set(n.id, n);
-
-        for (const e of edgesRef.current) {
-          const src = nodeById2.get(e.sourceId);
-          const tgt = nodeById2.get(e.targetId);
-          if (!src || !tgt) continue;
-          const curve = curveBetween(src.current, tgt.current);
-          e.outerTube.geometry.dispose();
-          e.outerTube.geometry = rebuildTube(curve, 0.04, 60, 8);
-          e.innerTube.geometry.dispose();
-          e.innerTube.geometry = rebuildTube(curve, 0.018, 60, 8);
-        }
-
-        if (allSettled && !burstDoneRef.current) {
-          burstDoneRef.current = true;
-          // Freeze geometry after a few more frames
-          setTimeout(() => {
-            burstFrozenRef.current = true;
-          }, 500);
-        }
-      }
-
-      // ── Selection dimming ──
-      const sel = selectedRef.current;
-      const conn = connectedRef.current;
-      for (const n of nodesRef.current) {
-        const mat = n.sphere.material as THREE.MeshStandardMaterial;
-        const glowMat = n.glow.material as THREE.SpriteMaterial;
-        const ringMat = n.ring.material as THREE.MeshBasicMaterial;
-
-        let targetOpacity = 1;
-        let ringOpacity = 0;
-        if (sel) {
-          if (n.id === sel) {
-            ringOpacity = 0.8;
-          } else if (conn.has(n.id)) {
-            targetOpacity = 0.85;
-          } else {
-            targetOpacity = 0.25;
-          }
-        }
-
-        mat.opacity += (targetOpacity - mat.opacity) * 0.1;
-        glowMat.opacity += ((targetOpacity * 0.35) - glowMat.opacity) * 0.1;
-        ringMat.opacity += (ringOpacity - ringMat.opacity) * 0.1;
-      }
-
-      // ── Edge dimming ──
-      for (const e of edgesRef.current) {
-        const outerMat = e.outerTube.material as THREE.MeshBasicMaterial;
-        const innerMat = e.innerTube.material as THREE.MeshBasicMaterial;
-        let tgtOpacity = 0.55;
-        let tgtInner = 0.8;
-        if (sel) {
-          if (e.sourceId === sel || e.targetId === sel) {
-            tgtOpacity = 0.7;
-            tgtInner = 0.9;
-          } else {
-            tgtOpacity = 0.1;
-            tgtInner = 0.15;
-          }
-        }
-        outerMat.opacity += (tgtOpacity - outerMat.opacity) * 0.1;
-        innerMat.opacity += (tgtInner - innerMat.opacity) * 0.1;
-      }
-
-      // ── Health view color transition ──
-      const ht = healthTransRef.current;
-      if (ht.transitioning) {
-        const elapsed = now - ht.startTime;
-        const tFrac = Math.min(1, elapsed / ht.duration);
-        for (const n of nodesRef.current) {
-          const from = ht.toHealth ? n.origColor : n.healthColor;
-          const to = ht.toHealth ? n.healthColor : n.origColor;
-          const c = new THREE.Color().lerpColors(from, to, tFrac);
-          (n.sphere.material as THREE.MeshStandardMaterial).color.copy(c);
-          (n.sphere.material as THREE.MeshStandardMaterial).emissive.copy(c);
-          (n.glow.material as THREE.SpriteMaterial).color.copy(c);
-          (n.ring.material as THREE.MeshBasicMaterial).color.copy(c);
-        }
-        if (tFrac >= 1) ht.transitioning = false;
-      }
-
-      // ── Particles ──
-      const nodeById3 = new Map<string, NodeMesh>();
-      for (const nm of nodesRef.current) nodeById3.set(nm.id, nm);
-
-      for (const p of particlesRef.current) {
-        const edge = edgesRef.current[p.edgeIdx];
-        if (!edge) continue;
-        const src = nodeById3.get(edge.sourceId);
-        const tgt = nodeById3.get(edge.targetId);
-        if (!src || !tgt) continue;
-
-        p.t += p.speed;
-        if (p.t > 1) p.t -= 1;
-
-        const curve = curveBetween(src.current, tgt.current);
-        const pt = curve.getPoint(p.t);
-        p.mesh.position.copy(pt);
-
-        // Opacity ramp
-        let op = 0.85;
-        if (p.t < 0.15) op = (p.t / 0.15) * 0.85;
-        else if (p.t > 0.85) op = ((1 - p.t) / 0.15) * 0.85;
-        (p.mesh.material as THREE.MeshBasicMaterial).opacity = op;
-
-        // Health view particle color
-        if (healthRef.current) {
-          const isNeg = tgt.type === "expense" || tgt.type === "debt";
-          (p.mesh.material as THREE.MeshBasicMaterial).color.set(
-            isNeg ? "#ff4d6d" : "#00d4ff"
-          );
-        } else {
-          (p.mesh.material as THREE.MeshBasicMaterial).color.set("#00d4ff");
-        }
-      }
-
-      // ── Update label + marker positions ──
-      updateLabels(camera, gp, renderer.domElement);
-
-      renderer.render(scene, camera);
-    };
-
-    rafRef.current = requestAnimationFrame(animate);
+    const updated: NodeView[] = financialNodes.map((fn, i) => {
+      const sn = simNodes[i];
+      return {
+        id: fn.id,
+        label: fn.label,
+        type: fn.type as FinancialNodeType,
+        amount: Math.max(fn.currentValue, fn.monthlyFlow) || 1,
+        radius: sn.radius,
+        color: getNodeColor(fn.type as FinancialNodeType),
+        x: sn.x ?? cx,
+        y: sn.y ?? cy,
+      };
+    });
+    setNodes(updated);
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      sim.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rfNodes, financialFlows, maxEdgeAmount, outboundSet]);
+  }, [financialNodes, financialFlows, radiiMap, size.w, size.h]);
 
-  // ── Update labels (called from animation loop) ──
-  const updateLabels = useCallback(
-    (
-      camera: THREE.PerspectiveCamera,
-      group: THREE.Group,
-      domCanvas: HTMLCanvasElement
-    ) => {
-      const lc = labelsContainerRef.current;
-      const mc = markersContainerRef.current;
-      if (!lc || !mc) return;
+  // Position lookup for edges (same as node positions — nodes move with lines)
+  const posMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number; radius: number }>();
+    for (const n of nodes) m.set(n.id, { x: n.x, y: n.y, radius: n.radius });
+    return m;
+  }, [nodes]);
 
-      const w = domCanvas.clientWidth;
-      const h = domCanvas.clientHeight;
-      const mode = labelModeRef.current;
-      const sel = selectedRef.current;
-      const conn = connectedRef.current;
+  // Convert screen coordinates (relative to container) to simulation coordinates
+  const screenToSim = useCallback((screenX: number, screenY: number) => {
+    const z = zoomParamsRef.current;
+    if (z) return { x: (screenX - z.tx) / z.scale, y: (screenY - z.ty) / z.scale };
+    return { x: screenX, y: screenY };
+  }, []);
 
-      for (const n of nodesRef.current) {
-        // Project to screen
-        const worldPos = n.current.clone();
-        group.localToWorld(worldPos);
-        const projected = worldPos.project(camera);
-        const sx = ((projected.x + 1) / 2) * w;
-        const sy = ((-projected.y + 1) / 2) * h;
-
-        // Update marker div
-        let marker = mc.querySelector<HTMLElement>(`[data-id="${n.id}"]`);
-        if (!marker) {
-          marker = document.createElement("div");
-          marker.setAttribute("data-id", n.id);
-          marker.style.position = "absolute";
-          marker.style.width = "10px";
-          marker.style.height = "10px";
-          marker.style.pointerEvents = "none";
-          mc.appendChild(marker);
-        }
-        marker.style.left = `${sx - 5}px`;
-        marker.style.top = `${sy - 5}px`;
-
-        // Update label div
-        const shouldShow =
-          mode === "all" ||
-          (mode === "important" && (n.type === "income" || n.type === "debt"));
-
-        let label = lc.querySelector<HTMLElement>(`[data-label-id="${n.id}"]`);
-        if (!label) {
-          label = document.createElement("div");
-          label.setAttribute("data-label-id", n.id);
-          label.style.position = "absolute";
-          label.style.transform = "translate(-50%, calc(-100% - 14px))";
-          label.style.background = "rgba(8, 8, 15, 0.88)";
-          label.style.border = "1px solid rgba(127,127,250,0.2)";
-          label.style.borderRadius = "9px";
-          label.style.padding = "8px 14px";
-          label.style.pointerEvents = "none";
-          label.style.zIndex = "8";
-          label.style.backdropFilter = "blur(4px)";
-          label.style.transition = "opacity 0.2s ease";
-          label.style.textAlign = "center";
-          label.style.whiteSpace = "nowrap";
-
-          const nameEl = document.createElement("div");
-          nameEl.className = "font-sans";
-          nameEl.style.fontWeight = "700";
-          nameEl.style.fontSize = "14px";
-          nameEl.style.color = "#e8e8ff";
-          nameEl.style.lineHeight = "1.2";
-          nameEl.setAttribute("data-name", "true");
-          label.appendChild(nameEl);
-
-          const amtEl = document.createElement("div");
-          amtEl.className = "font-mono";
-          amtEl.style.fontSize = "13px";
-          amtEl.style.lineHeight = "1.2";
-          amtEl.style.marginTop = "2px";
-          amtEl.setAttribute("data-amt", "true");
-          label.appendChild(amtEl);
-
-          lc.appendChild(label);
-        }
-
-        // Update text content
-        const nameEl = label.querySelector<HTMLElement>("[data-name]");
-        const amtEl = label.querySelector<HTMLElement>("[data-amt]");
-        if (nameEl) nameEl.textContent = n.label;
-        if (amtEl) {
-          amtEl.textContent = formatCurrency(n.amount);
-          const currentColor = healthRef.current
-            ? n.healthColor.getStyle()
-            : n.origColor.getStyle();
-          amtEl.style.color = currentColor;
-        }
-
-        label.style.left = `${sx}px`;
-        label.style.top = `${sy}px`;
-
-        if (!shouldShow) {
-          label.style.display = "none";
-        } else {
-          label.style.display = "block";
-          let opacity = 1;
-          if (sel) {
-            if (n.id === sel) opacity = 1;
-            else if (conn.has(n.id)) opacity = 0.7;
-            else opacity = 0.2;
-          }
-          label.style.opacity = String(opacity);
-        }
-      }
-    },
-    []
-  );
-
-  // ── Health view toggle handler ──
-  const toggleHealth = useCallback(() => {
-    setHealthView((prev) => {
-      const next = !prev;
-      healthTransRef.current = {
-        transitioning: true,
-        startTime: performance.now(),
-        toHealth: next,
-        duration: 400,
+  // ── Drag handlers (no simulation restart — only move the dragged node)
+  const handleMouseDown = useCallback(
+    (nodeId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      didDragRef.current = false;
+      const sn = simNodesRef.current.find((s) => s.id === nodeId);
+      if (!sn) return;
+      draggingRef.current = nodeId;
+      const rect = containerRef.current!.getBoundingClientRect();
+      const sim = screenToSim(e.clientX - rect.left, e.clientY - rect.top);
+      dragOffsetRef.current = {
+        x: (sn.x ?? 0) - sim.x,
+        y: (sn.y ?? 0) - sim.y,
       };
-      return next;
-    });
-  }, []);
-
-  // ── Label mode cycle ──
-  const cycleLabelMode = useCallback(() => {
-    setLabelMode((prev) => {
-      if (prev === "none") return "important";
-      if (prev === "important") return "all";
-      return "none";
-    });
-  }, []);
-
-  const labelButtonText = labelMode === "none" ? "Show Labels" : labelMode === "important" ? "All Labels" : "Hide Labels";
-  const healthButtonText = healthView ? "Disable Health View" : "Enable Health View";
-
-  // ── Click handler ──
-  const handleCanvasClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!interactRef.current) return;
-      const canvas = canvasRef.current;
-      const camera = cameraRef.current;
-      const group = groupRef.current;
-      if (!canvas || !camera || !group) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      );
-
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, camera);
-
-      const spheres = nodesRef.current.map((n) => n.sphere);
-      const intersects = raycaster.intersectObjects(spheres, false);
-
-      if (intersects.length > 0) {
-        const nodeId = intersects[0].object.userData.nodeId;
-        if (nodeId) {
-          if (selectedRef.current === nodeId) {
-            onDeselectNode();
-          } else {
-            onSelectNode(nodeId);
-          }
-        }
-      } else {
-        onDeselectNode();
-      }
+      sn.fx = sn.x;
+      sn.fy = sn.y;
     },
-    [onSelectNode, onDeselectNode]
+    [screenToSim]
   );
 
-  // Toggle button style
-  const btnStyle: React.CSSProperties = {
-    background: "rgba(10, 10, 20, 0.85)",
-    border: "1px solid #1a1a2e",
-    borderRadius: 8,
-    padding: "10px 18px",
-    fontWeight: 600,
-    fontSize: 13,
-    color: "#e8e8ff",
-    backdropFilter: "blur(8px)",
-    transition: "all 0.2s ease",
-    cursor: "pointer",
-    zIndex: 20,
-    fontFamily: "var(--font-manrope), sans-serif",
-  };
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      didDragRef.current = true;
+      const sn = simNodesRef.current.find((s) => s.id === draggingRef.current);
+      if (!sn) return;
+      const rect = containerRef.current!.getBoundingClientRect();
+      const sim = screenToSim(e.clientX - rect.left, e.clientY - rect.top);
+      const x = sim.x + dragOffsetRef.current.x;
+      const y = sim.y + dragOffsetRef.current.y;
+      sn.fx = x;
+      sn.fy = y;
+      sn.x = x;
+      sn.y = y;
+      // Sync positions to state so the node and its edges move (no simulation tick)
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.id !== sn.id) return node;
+          return { ...node, x, y };
+        })
+      );
+    };
+
+    const handleUp = () => {
+      if (!draggingRef.current) return;
+      const sn = simNodesRef.current.find((s) => s.id === draggingRef.current);
+      if (sn) {
+        sn.fx = undefined;
+        sn.fy = undefined;
+      }
+      draggingRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [screenToSim]);
+
+  // ── Click to zoom ──
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      if (didDragRef.current) return; // was a drag, not a click
+      if (selectedId === nodeId) {
+        setSelectedId(null);
+        setZoomTarget(null);
+        onDeselectNode();
+        return;
+      }
+      const pos = posMap.get(nodeId);
+      if (pos) {
+        setSelectedId(nodeId);
+        setZoomTarget({ x: pos.x, y: pos.y });
+        onSelectNode(nodeId);
+      }
+    },
+    [selectedId, posMap, onSelectNode, onDeselectNode]
+  );
+
+  const handleCanvasClick = useCallback(() => {
+    if (selectedId) {
+      setSelectedId(null);
+      setZoomTarget(null);
+      onDeselectNode();
+    }
+  }, [selectedId, onDeselectNode]);
+
+  // ── Flow view particles (along the connecting lines) ──
+  useEffect(() => {
+    if (!flowView) {
+      particlesRef.current = [];
+      return;
+    }
+    // Initialize particles for each flow
+    const particles: Particle[] = [];
+    for (const flow of financialFlows) {
+      const srcNode = financialNodes.find((n) => n.id === flow.source);
+      const isIncome = srcNode?.type === "income";
+      for (let i = 0; i < 3; i++) {
+        particles.push({
+          flowId: flow.id,
+          t: i / 3,
+          speed: 0.002 + Math.random() * 0.001,
+          isIncome,
+        });
+      }
+    }
+    particlesRef.current = particles;
+  }, [flowView, financialFlows, financialNodes]);
+
+  // Canvas particle rendering (particles move along the lines)
+  useEffect(() => {
+    if (!flowView) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let particleRaf: number;
+    const drawParticles = () => {
+      canvas.width = size.w;
+      canvas.height = size.h;
+      ctx.clearRect(0, 0, size.w, size.h);
+
+      for (const p of particlesRef.current) {
+        const flow = financialFlows.find((f) => f.id === p.flowId);
+        if (!flow) continue;
+        const src = posMap.get(flow.source);
+        const tgt = posMap.get(flow.target);
+        if (!src || !tgt) continue;
+
+        // Advance particle
+        p.t += p.speed;
+        if (p.t >= 1) p.t = 0;
+
+        // Calculate control point for quadratic bezier (matching edge rendering)
+        const dx = tgt.x - src.x;
+        const dy = tgt.y - src.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const curveOffset = Math.min(len * 0.08, 20);
+        const nx = (-dy / len) * curveOffset;
+        const ny = (dx / len) * curveOffset;
+        const mx = (src.x + tgt.x) / 2 + nx;
+        const my = (src.y + tgt.y) / 2 + ny;
+
+        const pt = quadBezierPoint(src.x, src.y, mx, my, tgt.x, tgt.y, p.t);
+
+        // Check distance to target node - fade as particle approaches
+        const distToTarget = Math.sqrt(
+          (pt.x - tgt.x) ** 2 + (pt.y - tgt.y) ** 2
+        );
+        const targetRadius = tgt.radius ?? 28;
+        if (distToTarget < targetRadius) continue; // absorbed by node
+
+        // Also skip if too close to source
+        const distToSource = Math.sqrt(
+          (pt.x - src.x) ** 2 + (pt.y - src.y) ** 2
+        );
+        const sourceRadius = src.radius ?? 28;
+        if (distToSource < sourceRadius) continue;
+
+        // Fade as approaching target node
+        const fadeZone = 30;
+        let alpha = 0.7;
+        if (distToTarget < targetRadius + fadeZone) {
+          alpha *= (distToTarget - targetRadius) / fadeZone;
+        }
+
+        const color = p.isIncome ? HEALTH_POS : HEALTH_NEG;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      particleRaf = requestAnimationFrame(drawParticles);
+    };
+
+    particleRaf = requestAnimationFrame(drawParticles);
+    return () => cancelAnimationFrame(particleRaf);
+  }, [flowView, financialFlows, posMap, size.w, size.h]);
+
+  // Compute zoom transform
+  const zoomTransform = useMemo(() => {
+    if (!zoomTarget || !selectedId) return undefined;
+    const scale = 1.5;
+    const tx = size.w / 2 - zoomTarget.x * scale;
+    const ty = size.h / 2 - zoomTarget.y * scale;
+    return `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }, [zoomTarget, selectedId, size.w, size.h]);
+
+  // Keep zoom params ref in sync for drag coordinate conversion
+  useEffect(() => {
+    if (zoomTarget && selectedId) {
+      const scale = 1.5;
+      zoomParamsRef.current = {
+        tx: size.w / 2 - zoomTarget.x * scale,
+        ty: size.h / 2 - zoomTarget.y * scale,
+        scale,
+      };
+    } else {
+      zoomParamsRef.current = null;
+    }
+  }, [zoomTarget, selectedId, size.w, size.h]);
+
+  // Selected node data for popup
+  const selectedNode = useMemo(() => {
+    if (!selectedId) return null;
+    return nodeMap.get(selectedId) ?? null;
+  }, [selectedId, nodeMap]);
+
+  // Popup anchor position (in container coordinates, accounting for zoom)
+  const popupAnchor = useMemo(() => {
+    if (!selectedId || !zoomTarget) return null;
+    const nodePos = posMap.get(selectedId);
+    if (!nodePos) return null;
+    const scale = 1.5;
+    const tx = size.w / 2 - zoomTarget.x * scale;
+    const ty = size.h / 2 - zoomTarget.y * scale;
+    return {
+      x: nodePos.x * scale + tx + (nodePos.radius ?? 28) * scale,
+      y: nodePos.y * scale + ty,
+    };
+  }, [selectedId, zoomTarget, posMap, size.w, size.h]);
 
   return (
-    <div ref={containerRef} className="react-flow relative w-full h-full">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        onClick={handleCanvasClick}
-        style={{ cursor: interactionEnabled ? "pointer" : "default" }}
-      />
-
-      {/* Labels overlay */}
+    <div
+      ref={containerRef}
+      className="relative w-full h-full overflow-hidden"
+      onClick={handleCanvasClick}
+      style={{ cursor: draggingRef.current ? "grabbing" : "default" }}
+    >
+      {/* Zoom wrapper */}
       <div
-        ref={labelsContainerRef}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-        style={{ zIndex: 8 }}
-      />
-
-      {/* Invisible markers for popup positioning */}
-      <div
-        ref={markersContainerRef}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-        style={{ opacity: 0 }}
-      />
-
-      {/* Toggle buttons */}
-      <div className="absolute flex flex-col gap-2.5" style={{ top: 20, right: 20, zIndex: 20 }}>
-        <button
-          onClick={cycleLabelMode}
-          className="font-sans"
-          style={btnStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "rgba(127,127,250,0.4)";
-            e.currentTarget.style.background = "rgba(127,127,250,0.06)";
+        className="relative"
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: zoomTransform ?? "none",
+          transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+          transformOrigin: "0 0",
+        }}
+      >
+        {/* Glow behind nodes: Vector texture + radial gradient (Figma-style) */}
+        <Image
+          src="/images/Vector.png"
+          alt=""
+          fill
+          className="object-cover pointer-events-none select-none"
+          style={{ opacity: 0.22, zIndex: 0 }}
+          priority
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            zIndex: 0,
+            background: "radial-gradient(ellipse 80% 70% at 50% 50%, rgba(127, 127, 250, 0.14) 0%, rgba(127, 127, 250, 0.04) 50%, transparent 75%)",
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "#1a1a2e";
-            e.currentTarget.style.background = "rgba(10, 10, 20, 0.85)";
+        />
+        {/* SVG edges — same coordinate space as nodes so lines move with nodes */}
+        <svg
+          className="absolute inset-0 w-full h-full"
+          width={size.w}
+          height={size.h}
+          style={{ zIndex: 1, pointerEvents: "none" }}
+        >
+          {financialFlows.map((flow) => {
+            const src = posMap.get(flow.source);
+            const tgt = posMap.get(flow.target);
+            if (!src || !tgt) return null;
+
+            const dx = tgt.x - src.x;
+            const dy = tgt.y - src.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const curveOffset = Math.min(len * 0.08, 20);
+            const nx = (-dy / len) * curveOffset;
+            const ny = (dx / len) * curveOffset;
+            const mx = (src.x + tgt.x) / 2 + nx;
+            const my = (src.y + tgt.y) / 2 + ny;
+
+            const isConnectedToSelected = selectedId && (flow.source === selectedId || flow.target === selectedId);
+            const isConnectedToHovered = !selectedId && hoveredId && (flow.source === hoveredId || flow.target === hoveredId);
+            const isActive = isConnectedToSelected || isConnectedToHovered;
+            const dimmed = (selectedId ?? hoveredId) && !isActive;
+
+            return (
+              <path
+                key={flow.id}
+                d={`M ${src.x} ${src.y} Q ${mx} ${my} ${tgt.x} ${tgt.y}`}
+                fill="none"
+                stroke={
+                  isConnectedToSelected
+                    ? "rgba(127,127,250,0.95)"
+                    : isActive
+                      ? "rgba(127,127,250,0.6)"
+                      : "rgba(127,127,250,0.35)"
+                }
+                strokeWidth={isConnectedToSelected ? 2.8 : isActive ? 2.2 : 1.4}
+                style={{
+                  transition: "all 200ms ease",
+                  opacity: dimmed ? 0.12 : 1,
+                }}
+              />
+            );
+          })}
+        </svg>
+
+        {/* Canvas for flow particles */}
+        {flowView && (
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+            style={{ zIndex: 2, pointerEvents: "none" }}
+            width={size.w}
+            height={size.h}
+          />
+        )}
+
+        {/* HTML nodes */}
+        {nodes.map((node) => {
+          const isHovered = hoveredId === node.id;
+          const isSelected = selectedId === node.id;
+          const activeId = selectedId ?? hoveredId;
+          const isConnected = connectedSet.has(node.id);
+          const dimmed = activeId !== null && !isHovered && !isSelected && !isConnected;
+
+          return (
+            <div
+              key={node.id}
+              data-node-id={node.id}
+              className="absolute select-none"
+              style={{
+                left: node.x,
+                top: node.y,
+                transform: `translate(-50%, -50%) scale(${isHovered || isSelected ? 1.12 : 1})`,
+                transition: draggingRef.current === node.id ? "none" : "transform 200ms ease, opacity 200ms ease",
+                opacity: dimmed ? 0.3 : 1,
+                zIndex: isHovered || isSelected ? 10 : 2,
+                cursor: draggingRef.current === node.id ? "grabbing" : "grab",
+              }}
+              onMouseEnter={() => { if (!draggingRef.current) setHoveredId(node.id); }}
+              onMouseLeave={() => { if (!draggingRef.current) setHoveredId(null); }}
+              onMouseDown={(e) => handleMouseDown(node.id, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNodeClick(node.id);
+              }}
+            >
+              {/* Circle — flat matte, fully opaque */}
+              <div
+                style={{
+                  width: node.radius * 2,
+                  height: node.radius * 2,
+                  borderRadius: "50%",
+                  background: darken(node.color, 0.15),
+                  boxShadow: isHovered || isSelected
+                    ? `0 0 20px ${node.color}40`
+                    : "none",
+                  transition: "box-shadow 200ms ease",
+                  border: `1.5px solid ${node.color}30`,
+                  position: "relative",
+                  zIndex: 2,
+                }}
+              />
+              {/* Label */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  marginTop: 5,
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  pointerEvents: "none",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    fontWeight: 600,
+                    fontSize: 10,
+                    color: "#e8e8ff",
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {node.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    fontSize: 9,
+                    color: node.color,
+                    lineHeight: 1.25,
+                    fontWeight: 500,
+                  }}
+                >
+                  {formatCurrency(node.amount)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Toggle buttons — top right, outside zoom wrapper */}
+      <div
+        className="absolute top-4 right-4 flex flex-col gap-2"
+        style={{ zIndex: 20 }}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFlowView((v) => !v);
+          }}
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition"
+          style={{
+            fontFamily: "'Manrope', sans-serif",
+            background: flowView ? "rgba(127,127,250,0.2)" : "rgba(10,10,20,0.7)",
+            border: flowView
+              ? "1px solid rgba(127,127,250,0.5)"
+              : "1px solid rgba(127,127,250,0.15)",
+            color: flowView ? "#c8c8ff" : "#6b6b9a",
+            backdropFilter: "blur(8px)",
           }}
         >
-          {labelButtonText}
-        </button>
-        <button
-          onClick={toggleHealth}
-          className="font-sans"
-          style={btnStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "rgba(127,127,250,0.4)";
-            e.currentTarget.style.background = "rgba(127,127,250,0.06)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "#1a1a2e";
-            e.currentTarget.style.background = "rgba(10, 10, 20, 0.85)";
-          }}
-        >
-          {healthButtonText}
+          <Workflow className="w-3 h-3" />
+          Flow
         </button>
       </div>
+
+      {/* Node popup — rendered outside the zoom wrapper so it doesn't scale */}
+      {selectedNode && popupAnchor && (
+        <NodePopup
+          node={selectedNode}
+          connectedFlows={connectedFlows}
+          nodeMap={nodeMap}
+          onClose={() => {
+            setSelectedId(null);
+            setZoomTarget(null);
+            onDeselectNode();
+          }}
+          anchorX={popupAnchor.x}
+          anchorY={popupAnchor.y}
+          containerWidth={size.w}
+          containerHeight={size.h}
+        />
+      )}
     </div>
   );
+}
+
+/* Darken a hex color by a fraction (0-1) */
+function darken(hex: string, amount: number): string {
+  const h = hex.replace("#", "");
+  const r = Math.max(0, Math.round(parseInt(h.substring(0, 2), 16) * (1 - amount)));
+  const g = Math.max(0, Math.round(parseInt(h.substring(2, 4), 16) * (1 - amount)));
+  const b = Math.max(0, Math.round(parseInt(h.substring(4, 6), 16) * (1 - amount)));
+  return `rgb(${r},${g},${b})`;
 }

@@ -65,7 +65,7 @@ function FinancialEdgeComponent({
           className="pointer-events-none overflow-visible"
         >
           <div className="flex items-center justify-center">
-            <span className="rounded bg-zinc-900/95 border border-white/10 px-2 py-0.5 text-[10px] font-mono text-zinc-300 whitespace-nowrap shadow-lg">
+            <span className="rounded bg-zinc-900/95 border border-white/10 px-2 py-0.5 text-[10px] text-zinc-300 whitespace-nowrap shadow-lg font-sans tabular-nums">
               {formatCurrency(data.amount)}/mo
             </span>
           </div>

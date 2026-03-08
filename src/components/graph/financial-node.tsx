@@ -73,7 +73,7 @@ function FinancialNodeComponent({ data, selected, dragging }: NodeProps<NodeRfDa
         <div className="rounded-md bg-zinc-900 border border-white/10 px-2.5 py-1.5 shadow-lg whitespace-nowrap">
           <p className="text-xs font-medium text-zinc-200">{label}</p>
           {displayValue > 0 && (
-            <p className="text-[10px] text-zinc-500 font-mono">
+            <p className="text-[10px] text-zinc-500 font-sans tabular-nums">
               {formatCurrency(displayValue)}{monthlyFlow > 0 && currentValue <= 0 ? "/mo" : ""}
             </p>
           )}

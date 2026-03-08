@@ -55,7 +55,7 @@ export function NodeDetailPanel({
         {node.monthlyFlow > 0 && (
           <div className="flex justify-between text-xs">
             <span className="text-zinc-500">Monthly flow</span>
-            <span className="font-mono text-zinc-200">
+            <span className="text-zinc-200">
               {formatCurrency(node.monthlyFlow)}
             </span>
           </div>
@@ -63,7 +63,7 @@ export function NodeDetailPanel({
         {node.currentValue > 0 && (
           <div className="flex justify-between text-xs">
             <span className="text-zinc-500">Current value</span>
-            <span className="font-mono text-zinc-200">
+            <span className="text-zinc-200">
               {formatCurrency(node.currentValue)}
             </span>
           </div>
@@ -97,7 +97,7 @@ export function NodeDetailPanel({
                   {nodeMap.get(f.source)?.label ?? f.source}
                 </span>
                 <ArrowRight className="h-3 w-3 text-zinc-600 shrink-0" />
-                <span className="font-mono text-zinc-300 shrink-0">
+                <span className="text-zinc-300 shrink-0 tabular-nums">
                   {formatCurrency(f.amount)}
                 </span>
               </div>
@@ -119,7 +119,7 @@ export function NodeDetailPanel({
                   {nodeMap.get(f.target)?.label ?? f.target}
                 </span>
                 <ArrowRight className="h-3 w-3 text-zinc-600 shrink-0" />
-                <span className="font-mono text-zinc-300 shrink-0">
+                <span className="text-zinc-300 shrink-0 tabular-nums">
                   {formatCurrency(f.amount)}
                 </span>
               </div>

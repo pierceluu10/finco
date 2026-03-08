@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { ReactFlowProvider } from "reactflow";
 import Image from "next/image";
 
 import { demoNodes, demoEdges } from "@/lib/demo-data";
@@ -16,7 +15,6 @@ import { AddNodeDialog } from "@/components/panels/add-node-dialog";
 import { DeleteConfirmDialog } from "@/components/panels/delete-confirm-dialog";
 import { CsvUploadDialog } from "@/components/panels/csv-upload-dialog";
 import { AgentChatModal } from "@/components/panels/agent-chat-modal";
-import { NodePopup } from "@/components/panels/node-popup";
 import type {
   DialogMode,
   FinancialNodeData,
@@ -31,75 +29,52 @@ import type {
 type AgentType = "librarian" | "simulator" | "sentinel";
 
 const STORAGE_KEY = "finco-sidebar-collapsed";
-const TRANSITION_MS = 350;
-const INTRO_SESSION_KEY = "ecosystem-loaded";
+const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
+const SIDEBAR_SLIDE = "500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
 
 const seedData = fromDemoData(demoNodes, demoEdges);
 
 function EcosystemDashboard() {
   const graph = useFinancialGraph(seedData.nodes, seedData.flows);
 
-  // ── Sidebar collapse ──
+  // ── Sidebar collapse (persisted) ──
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === "true") setSidebarCollapsed(true);
-    } catch {
-      /* noop */
-    }
+    } catch { /* noop */ }
   }, []);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        /* noop */
-      }
+      try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* noop */ }
       return next;
     });
   }, []);
 
-  // ── Entry sequence ──
-  const [introSkip] = useState(() => {
-    if (typeof window !== "undefined")
-      return !!sessionStorage.getItem(INTRO_SESSION_KEY);
-    return true;
-  });
-
-  const [sidebarIn, setSidebarIn] = useState(introSkip);
-  const [contentIn, setContentIn] = useState(introSkip);
-  const [graphIn, setGraphIn] = useState(introSkip);
-  const [uiIn, setUiIn] = useState(introSkip);
-  const [introDone, setIntroDone] = useState(introSkip);
-  const [burstActive, setBurstActive] = useState(introSkip);
-  const [interactionEnabled, setInteractionEnabled] = useState(introSkip);
+  // ── Entry sequence — always plays on mount, no sessionStorage ──
+  const [sidebarIn, setSidebarIn] = useState(false);
+  const [contentIn, setContentIn] = useState(false);
+  const [graphIn, setGraphIn] = useState(false);
+  const [uiIn, setUiIn] = useState(false);
+  const [introDone, setIntroDone] = useState(false);
+  const [burstActive, setBurstActive] = useState(false);
+  const [interactionEnabled, setInteractionEnabled] = useState(false);
 
   useEffect(() => {
-    if (introSkip) return;
     const timers = [
       setTimeout(() => setSidebarIn(true), 1200),
       setTimeout(() => setContentIn(true), 1400),
-      setTimeout(() => {
-        setGraphIn(true);
-        setBurstActive(true);
-      }, 1700),
+      setTimeout(() => { setGraphIn(true); setBurstActive(true); }, 1700),
       setTimeout(() => setUiIn(true), 1900),
       setTimeout(() => setInteractionEnabled(true), 2200),
-      setTimeout(() => {
-        setIntroDone(true);
-        try {
-          sessionStorage.setItem(INTRO_SESSION_KEY, "true");
-        } catch {
-          /* noop */
-        }
-      }, 3500),
+      setTimeout(() => setIntroDone(true), 3500),
     ];
     return () => timers.forEach(clearTimeout);
-  }, [introSkip]);
+  }, []);
 
   // ── Dialogs ──
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -125,14 +100,10 @@ function EcosystemDashboard() {
   const editConnections = useMemo(() => {
     if (!editTarget) return [];
     return graph.financialFlows
-      .filter(
-        (f) => f.source === editTarget.id || f.target === editTarget.id
-      )
+      .filter((f) => f.source === editTarget.id || f.target === editTarget.id)
       .map((f) => ({
         targetId: f.source === editTarget.id ? f.target : f.source,
-        direction: (f.source === editTarget.id ? "to" : "from") as
-          | "to"
-          | "from",
+        direction: (f.source === editTarget.id ? "to" : "from") as "to" | "from",
         amount: f.amount,
         frequency: f.frequency,
       }));
@@ -187,9 +158,7 @@ function EcosystemDashboard() {
       for (const an of apiNodes) {
         const fType = TYPE_MAP[an.type] ?? "expense";
         const existing = graph.financialNodes.find(
-          (n) =>
-            n.type === fType &&
-            n.label.toLowerCase() === an.label.toLowerCase()
+          (n) => n.type === fType && n.label.toLowerCase() === an.label.toLowerCase()
         );
 
         if (existing) {
@@ -239,7 +208,6 @@ function EcosystemDashboard() {
     [graph]
   );
 
-  // ── Selection helpers for ThreeGraph ──
   const handleSelectNode = useCallback(
     (id: string) => {
       graph.setSelectedNodeId(id);
@@ -247,9 +215,6 @@ function EcosystemDashboard() {
     },
     [graph]
   );
-
-  const TRANSITION = "350ms cubic-bezier(0.4, 0, 0.2, 1)";
-  const SIDEBAR_SLIDE = "500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
 
   // Sidebar intro styles
   const sidebarOuter: React.CSSProperties | undefined =
@@ -265,43 +230,26 @@ function EcosystemDashboard() {
 
   return (
     <>
-      {/* ── PHASE 1 — Intro overlay ── */}
-      {!introSkip && !sidebarIn && (
+      {/* ── PHASE 1 — Intro logo overlay ── */}
+      {!sidebarIn && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center"
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
           style={{ background: "#050508" }}
         >
           <div
             className="text-center"
-            style={{ animation: "introLogoSeq 1200ms ease forwards" }}
+            style={{ animation: "introLogoSeq 1200ms cubic-bezier(0.4,0,0.2,1) forwards" }}
           >
-            <div className="flex items-center justify-center gap-0">
-              <span
-                className="font-mono"
-                style={{
-                  fontWeight: 800,
-                  fontSize: 48,
-                  color: "#e8e8ff",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                FINCO
+            <div className="flex items-center justify-center gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 448 512">
+                <path fill="#7F7FFA" d="M248 106.6c18.9-9 32-28.3 32-50.6c0-30.9-25.1-56-56-56s-56 25.1-56 56c0 22.3 13.1 41.6 32 50.6v98.8c-2.8 1.3-5.5 2.9-8 4.7l-80.1-45.8c1.6-20.8-8.6-41.6-27.9-52.8C57.2 96 23 105.2 7.5 132S1.2 193 28 208.5c1.3.8 2.6 1.5 4 2.1v90.8c-1.3.6-2.7 1.3-4 2.1C1.2 319-8 353.2 7.5 380s49.7 36 76.5 20.5c19.3-11.1 29.4-32 27.8-52.8l50.5-28.9c-11.5-11.2-19.9-25.6-23.8-41.7l-50.5 29c-2.6-1.8-5.2-3.3-8-4.7v-90.8c2.8-1.3 5.5-2.9 8-4.7l80.1 45.8c-.1 1.4-.2 2.8-.2 4.3c0 22.3 13.1 41.6 32 50.6v98.8c-18.9 9-32 28.3-32 50.6c0 30.9 25.1 56 56 56s56-25.1 56-56c0-22.3-13.1-41.6-32-50.6v-98.8c2.8-1.3 5.5-2.9 8-4.7l80.1 45.8c-1.6 20.8 8.6 41.6 27.8 52.8c26.8 15.5 61 6.3 76.5-20.5s6.3-61-20.5-76.5c-1.3-.8-2.7-1.5-4-2.1v-90.8c1.4-.6 2.7-1.3 4-2.1c26.8-15.5 36-49.7 20.5-76.5s-49.5-36-76.3-20.5c-19.3 11.1-29.4 32-27.8 52.8l-50.6 28.9c11.5 11.2 19.9 25.6 23.8 41.7l50.6-29c2.6 1.8 5.2 3.3 8 4.7v90.8c-2.8 1.3-5.5 2.9-8 4.6l-80.1-45.8c.1-1.4.2-2.8.2-4.3c0-22.3-13.1-41.6-32-50.6v-98.8z" />
+              </svg>
+              <span className="font-bold tracking-[-0.018em] text-finco-blue text-[30px]">
+                Finco
               </span>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#7F7FFA",
-                  boxShadow: "0 0 16px #7F7FFA",
-                  marginLeft: 2,
-                  marginTop: 8,
-                }}
-              />
             </div>
             <p
-              className="font-sans mt-2"
+              className="font-sans mt-3"
               style={{ fontWeight: 500, fontSize: 16, color: "#6b6b9a" }}
             >
               Your financial ecosystem
@@ -310,12 +258,14 @@ function EcosystemDashboard() {
         </div>
       )}
 
-      {/* ── Main layout ── */}
+      {/* ── Main layout (starts invisible, fades in per phase) ── */}
       <div
         className="h-full w-full"
         style={{
-          paddingLeft: sidebarCollapsed ? 24 : "33.333vw",
+          paddingLeft: sidebarCollapsed ? 24 : "25vw",
           transition: `padding-left ${TRANSITION}`,
+          opacity: sidebarIn ? 1 : 0,
+          pointerEvents: sidebarIn ? "auto" : "none",
         }}
       >
         <AppSidebar
@@ -328,9 +278,7 @@ function EcosystemDashboard() {
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
           onOpenAgentChat={(agent) => setAgentChatAgent(agent)}
-          onAddNodeDirect={(data, connections) =>
-            graph.addNode(data, connections)
-          }
+          onAddNodeDirect={(data, connections) => graph.addNode(data, connections)}
           onCsvImportDirect={handleCsvImport}
           onParsedCsvMerge={handleParsedCsvMerge}
           introStyle={sidebarOuter}
@@ -338,7 +286,6 @@ function EcosystemDashboard() {
         />
 
         <div className="relative h-full overflow-hidden">
-          {/* Background image */}
           <Image
             src="/images/Vector.png"
             alt=""
@@ -348,7 +295,6 @@ function EcosystemDashboard() {
             priority
           />
 
-          {/* 3D Graph canvas */}
           <div
             className="absolute inset-0"
             style={{
@@ -371,30 +317,18 @@ function EcosystemDashboard() {
             />
           </div>
 
-          {/* Node popup */}
-          {graph.selectedNode && (
-            <NodePopup
-              node={graph.selectedNode}
-              connectedFlows={graph.connectedFlows}
-              nodeMap={graph.nodeMap}
-              onClose={graph.deselectNode}
-            />
-          )}
-
-          {/* Legend */}
           <div
             className="absolute bottom-4 left-4"
             style={{
               zIndex: 10,
               opacity: uiIn ? 1 : 0,
               transition: "opacity 300ms ease-out",
-              transitionDelay: introSkip ? "0ms" : "100ms",
+              transitionDelay: "100ms",
             }}
           >
             <GraphLegend />
           </div>
 
-          {/* Edge detail */}
           {graph.selectedFlow && (
             <EdgeDetailPanel
               flow={graph.selectedFlow}
@@ -439,11 +373,11 @@ function EcosystemDashboard() {
           nodeMap={graph.nodeMap}
         />
 
-        {/* Toast */}
         {toast && (
           <div
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] font-sans"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]"
             style={{
+              fontFamily: "'Manrope', sans-serif",
               fontWeight: 600,
               fontSize: 13,
               color: "#e8e8ff",
@@ -464,9 +398,5 @@ function EcosystemDashboard() {
 }
 
 export default function EcosystemPage() {
-  return (
-    <ReactFlowProvider>
-      <EcosystemDashboard />
-    </ReactFlowProvider>
-  );
+  return <EcosystemDashboard />;
 }

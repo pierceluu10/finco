@@ -49,7 +49,7 @@ export function EdgeDetailPanel({
         {/* Amount */}
         <div className="flex justify-between text-xs">
           <span className="text-zinc-500">Amount</span>
-          <span className="font-mono text-zinc-200">
+          <span className="text-zinc-200">
             {formatCurrency(flow.amount)}
           </span>
         </div>

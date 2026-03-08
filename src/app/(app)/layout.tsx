@@ -17,7 +17,7 @@ export default async function AppLayout({
     <div className="relative flex h-screen overflow-hidden bg-black">
       <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
       <div className="absolute inset-0 bg-radial-glow pointer-events-none" />
-      <main className="relative flex-1 pl-56">{children}</main>
+      <main className="relative flex-1 min-w-0">{children}</main>
     </div>
   );
 }

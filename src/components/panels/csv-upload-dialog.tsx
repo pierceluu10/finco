@@ -180,7 +180,7 @@ export function CsvUploadDialog({
                       <span className="text-[10px] text-zinc-500 capitalize">
                         {n.type}
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-400">
+                      <span className="text-[10px] text-zinc-400 font-sans tabular-nums">
                         ${n.monthlyFlow.toFixed(0)}
                       </span>
                     </div>

@@ -201,7 +201,7 @@ export function AddNodeDialog({
                   placeholder="0"
                   min="0"
                   step="0.01"
-                  className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none focus:ring-0 font-mono"
+                  className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none focus:ring-0 font-sans"
                 />
               </div>
               <div className="space-y-1.5">
@@ -215,7 +215,7 @@ export function AddNodeDialog({
                   placeholder="0"
                   min="0"
                   step="0.01"
-                  className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none focus:ring-0 font-mono"
+                  className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none focus:ring-0 font-sans"
                 />
               </div>
             </div>
@@ -283,7 +283,7 @@ export function AddNodeDialog({
                         })
                       }
                       placeholder="$"
-                      className="w-20 rounded border border-white/10 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 font-mono focus:outline-none"
+                      className="w-20 rounded border border-white/10 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 font-sans tabular-nums focus:outline-none"
                     />
 
                     <select
