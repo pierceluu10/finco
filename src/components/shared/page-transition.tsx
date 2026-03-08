@@ -46,7 +46,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       initial={variants.initial}
       animate={variants.animate}
       transition={variants.transition}
-      className="h-full w-full"
+      className="h-full w-full overflow-y-auto"
     >
       {children}
     </motion.div>

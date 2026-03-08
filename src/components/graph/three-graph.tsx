@@ -144,7 +144,10 @@ export function ThreeGraph({
   const draggingRef = useRef<string | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const didDragRef = useRef(false);
-  const zoomParamsRef = useRef<{ tx: number; ty: number; scale: number } | null>(null);
+  const cameraRef = useRef({ tx: 0, ty: 0, scale: 1 });
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  const didPanRef = useRef(false);
 
   // Particles ref (managed imperatively for performance)
   const particlesRef = useRef<Particle[]>([]);
@@ -170,8 +173,9 @@ export function ThreeGraph({
     ) as FinancialFlowData[];
   }, [selectedId, financialFlows]);
 
-  // Zoom state for click-to-zoom
-  const [zoomTarget, setZoomTarget] = useState<{ x: number; y: number } | null>(null);
+  // Camera state for pan/zoom (also used for click-to-zoom on node)
+  const [camera, setCamera] = useState({ tx: 0, ty: 0, scale: 1 });
+  const [smoothCamera, setSmoothCamera] = useState(false);
 
   // Observe container size
   useEffect(() => {
@@ -310,9 +314,8 @@ export function ThreeGraph({
 
   // Convert screen coordinates (relative to container) to simulation coordinates
   const screenToSim = useCallback((screenX: number, screenY: number) => {
-    const z = zoomParamsRef.current;
-    if (z) return { x: (screenX - z.tx) / z.scale, y: (screenY - z.ty) / z.scale };
-    return { x: screenX, y: screenY };
+    const c = cameraRef.current;
+    return { x: (screenX - c.tx) / c.scale, y: (screenY - c.ty) / c.scale };
   }, []);
 
   // ── Drag handlers (no simulation restart — only move the dragged node)
@@ -339,6 +342,20 @@ export function ThreeGraph({
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
+      // Canvas pan
+      if (isPanningRef.current) {
+        const dx = e.clientX - panStartRef.current.mx;
+        const dy = e.clientY - panStartRef.current.my;
+        const newTx = panStartRef.current.tx + dx;
+        const newTy = panStartRef.current.ty + dy;
+        const next = { ...cameraRef.current, tx: newTx, ty: newTy };
+        cameraRef.current = next;
+        setCamera(next);
+        setSmoothCamera(false);
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didPanRef.current = true;
+        return;
+      }
+      // Node drag
       if (!draggingRef.current) return;
       didDragRef.current = true;
       const sn = simNodesRef.current.find((s) => s.id === draggingRef.current);
@@ -351,7 +368,6 @@ export function ThreeGraph({
       sn.fy = y;
       sn.x = x;
       sn.y = y;
-      // Sync positions to state so the node and its edges move (no simulation tick)
       setNodes((prev) =>
         prev.map((node) => {
           if (node.id !== sn.id) return node;
@@ -361,6 +377,10 @@ export function ThreeGraph({
     };
 
     const handleUp = () => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        return;
+      }
       if (!draggingRef.current) return;
       const sn = simNodesRef.current.find((s) => s.id === draggingRef.current);
       if (sn) {
@@ -382,27 +402,45 @@ export function ThreeGraph({
   // ── Click to zoom ──
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      if (didDragRef.current) return; // was a drag, not a click
+      if (didDragRef.current) return;
       if (selectedId === nodeId) {
         setSelectedId(null);
-        setZoomTarget(null);
+        const reset = { tx: 0, ty: 0, scale: 1 };
+        cameraRef.current = reset;
+        setCamera(reset);
+        setSmoothCamera(true);
         onDeselectNode();
         return;
       }
       const pos = posMap.get(nodeId);
       if (pos) {
         setSelectedId(nodeId);
-        setZoomTarget({ x: pos.x, y: pos.y });
+        const scale = 1.5;
+        const next = {
+          tx: size.w / 2 - pos.x * scale,
+          ty: size.h / 2 - pos.y * scale,
+          scale,
+        };
+        cameraRef.current = next;
+        setCamera(next);
+        setSmoothCamera(true);
         onSelectNode(nodeId);
       }
     },
-    [selectedId, posMap, onSelectNode, onDeselectNode]
+    [selectedId, posMap, onSelectNode, onDeselectNode, size.w, size.h]
   );
 
   const handleCanvasClick = useCallback(() => {
+    if (didPanRef.current) {
+      didPanRef.current = false;
+      return;
+    }
     if (selectedId) {
       setSelectedId(null);
-      setZoomTarget(null);
+      const reset = { tx: 0, ty: 0, scale: 1 };
+      cameraRef.current = reset;
+      setCamera(reset);
+      setSmoothCamera(true);
       onDeselectNode();
     }
   }, [selectedId, onDeselectNode]);
@@ -516,28 +554,32 @@ export function ThreeGraph({
     return () => cancelAnimationFrame(particleRaf);
   }, [flowView, financialFlows, posMap, size.w, size.h, selectedId, hoveredId]);
 
-  // Compute zoom transform
-  const zoomTransform = useMemo(() => {
-    if (!zoomTarget || !selectedId) return undefined;
-    const scale = 1.5;
-    const tx = size.w / 2 - zoomTarget.x * scale;
-    const ty = size.h / 2 - zoomTarget.y * scale;
-    return `translate(${tx}px, ${ty}px) scale(${scale})`;
-  }, [zoomTarget, selectedId, size.w, size.h]);
-
-  // Keep zoom params ref in sync for drag coordinate conversion
+  // Wheel zoom handler
   useEffect(() => {
-    if (zoomTarget && selectedId) {
-      const scale = 1.5;
-      zoomParamsRef.current = {
-        tx: size.w / 2 - zoomTarget.x * scale,
-        ty: size.h / 2 - zoomTarget.y * scale,
-        scale,
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const dir = e.deltaY > 0 ? -1 : 1;
+      const factor = 1 + dir * 0.08;
+      const c = cameraRef.current;
+      const newScale = Math.min(Math.max(c.scale * factor, 0.2), 5);
+      const ratio = newScale / c.scale;
+      const next = {
+        tx: mx - ratio * (mx - c.tx),
+        ty: my - ratio * (my - c.ty),
+        scale: newScale,
       };
-    } else {
-      zoomParamsRef.current = null;
-    }
-  }, [zoomTarget, selectedId, size.w, size.h]);
+      cameraRef.current = next;
+      setCamera(next);
+      setSmoothCamera(false);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Selected node data for popup
   const selectedNode = useMemo(() => {
@@ -545,26 +587,36 @@ export function ThreeGraph({
     return nodeMap.get(selectedId) ?? null;
   }, [selectedId, nodeMap]);
 
-  // Popup anchor position (in container coordinates, accounting for zoom)
+  // Popup anchor position (in container coordinates, accounting for camera)
   const popupAnchor = useMemo(() => {
-    if (!selectedId || !zoomTarget) return null;
+    if (!selectedId) return null;
     const nodePos = posMap.get(selectedId);
     if (!nodePos) return null;
-    const scale = 1.5;
-    const tx = size.w / 2 - zoomTarget.x * scale;
-    const ty = size.h / 2 - zoomTarget.y * scale;
     return {
-      x: nodePos.x * scale + tx + (nodePos.radius ?? 28) * scale,
-      y: nodePos.y * scale + ty,
+      x: nodePos.x * camera.scale + camera.tx + (nodePos.radius ?? 28) * camera.scale,
+      y: nodePos.y * camera.scale + camera.ty,
     };
-  }, [selectedId, zoomTarget, posMap, size.w, size.h]);
+  }, [selectedId, posMap, camera]);
 
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full overflow-hidden"
       onClick={handleCanvasClick}
-      style={{ cursor: draggingRef.current ? "grabbing" : "default" }}
+      onMouseDown={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest("button") || t.closest("[data-node-id]")) return;
+        e.preventDefault();
+        isPanningRef.current = true;
+        didPanRef.current = false;
+        panStartRef.current = {
+          mx: e.clientX,
+          my: e.clientY,
+          tx: cameraRef.current.tx,
+          ty: cameraRef.current.ty,
+        };
+      }}
+      style={{ cursor: isDragging ? "grabbing" : "grab" }}
     >
       {/* Static: background glow (vector + gradient) — no animation */}
       <Image
@@ -599,8 +651,8 @@ export function ThreeGraph({
           style={{
             width: "100%",
             height: "100%",
-            transform: zoomTransform ?? "none",
-            transition: "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+            transform: `translate(${camera.tx}px, ${camera.ty}px) scale(${camera.scale})`,
+            transition: smoothCamera ? "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)" : "none",
             transformOrigin: "0 0",
           }}
         >
@@ -785,7 +837,10 @@ export function ThreeGraph({
           nodeMap={nodeMap}
           onClose={() => {
             setSelectedId(null);
-            setZoomTarget(null);
+            const reset = { tx: 0, ty: 0, scale: 1 };
+            cameraRef.current = reset;
+            setCamera(reset);
+            setSmoothCamera(true);
             onDeselectNode();
           }}
           anchorX={popupAnchor.x}
