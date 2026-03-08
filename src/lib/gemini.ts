@@ -11,41 +11,12 @@ function getGenAI() {
   return genAI;
 }
 
-export async function generateStrategistResponse(
-  message: string,
-  context: string
-): Promise<string> {
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-  const systemPrompt = `You are Finco's Financial Strategist AI. You help Canadian users understand their finances and make better decisions.
-
-CONTEXT (user's current financial state):
-${context}
-
-RULES:
-- Be concise and direct (2-4 paragraphs max)
-- Reference specific numbers from the user's data
-- Mention risk level when relevant (low/medium/high/critical)
-- Give one clear recommended action
-- Use Canadian financial context (TFSA, RRSP, CAD)
-- Don't be preachy or generic — be specific and grounded
-- Format key numbers with $ signs`;
-
-  const result = await model.generateContent([
-    { text: systemPrompt },
-    { text: message },
-  ]);
-
-  return result.response.text();
-}
-
 export async function generateLibrarianResponse(
   graphState: string,
   userMessage: string
 ): Promise<string> {
   const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const systemPrompt = `You are the Finco Librarian, a financial intelligence agent embedded inside a personal finance platform called Finco.
 
@@ -78,7 +49,7 @@ export async function generateSimulatorResponse(
   userMessage: string
 ): Promise<string> {
   const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const systemPrompt = `You are the Finco Simulator, a financial scenario engine embedded inside a personal finance platform called Finco.
 
@@ -109,7 +80,7 @@ export async function generateSentinelResponse(
   userMessage: string
 ): Promise<string> {
   const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const systemPrompt = `You are the Finco Sentinel, a financial monitoring and alert agent embedded inside a personal finance platform called Finco.
 
@@ -135,25 +106,3 @@ You never break character. If asked about anything outside financial monitoring,
   return result.response.text();
 }
 
-export async function generateForecastExplanation(
-  forecastData: Record<string, unknown>
-): Promise<string> {
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-  const systemPrompt = `You are Finco's Forecaster AI. Summarize the 30/60/90 day financial outlook.
-
-Given this forecast data, explain:
-1. Which periods look stable vs risky
-2. What's driving the pressure
-3. One actionable suggestion
-
-Be concise (2-3 sentences). Use Canadian financial context.`;
-
-  const result = await model.generateContent([
-    { text: systemPrompt },
-    { text: JSON.stringify(forecastData) },
-  ]);
-
-  return result.response.text();
-}

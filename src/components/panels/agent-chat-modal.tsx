@@ -132,7 +132,13 @@ export function AgentChatModal({
       const res = await fetch("/api/ai/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent, graphState, message: trimmed }),
+        body: JSON.stringify({
+          agent,
+          graphState,
+          message: trimmed,
+          nodes: financialNodes,
+          flows: financialFlows,
+        }),
       });
 
       if (!res.ok) throw new Error("API request failed");

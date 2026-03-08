@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS simulations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Backboard agent thread mappings
+CREATE TABLE IF NOT EXISTS user_agent_threads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  agent_name TEXT NOT NULL,
+  assistant_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, agent_name)
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
@@ -87,3 +99,4 @@ CREATE INDEX IF NOT EXISTS idx_financial_edges_user ON financial_edges(user_id);
 CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_simulations_user ON simulations(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_agent_threads_user ON user_agent_threads(user_id);
