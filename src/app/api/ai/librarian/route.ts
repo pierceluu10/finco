@@ -1,3 +1,7 @@
+/**
+ * @deprecated — Librarian has been merged into Sentinel.
+ * This route redirects to the Sentinel for backward compatibility.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import {
   isBackboardConfigured,
@@ -8,7 +12,7 @@ import { getOrCreateAssistant } from "@/lib/backboard/assistants";
 import { getOrCreateThread, resolveUserId } from "@/lib/backboard/threads";
 import { handleToolCall, type GraphContext } from "@/lib/backboard/tools";
 import { wrapRawGraphState } from "@/lib/backboard/formatters";
-import { generateLibrarianResponse } from "@/lib/gemini";
+import { generateSentinelResponse } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,10 +28,10 @@ export async function POST(req: NextRequest) {
     if (isBackboardConfigured()) {
       try {
         const userId = await resolveUserId();
-        const assistant = await getOrCreateAssistant("librarian");
+        const assistant = await getOrCreateAssistant("sentinel");
         const threadId = await getOrCreateThread(
           userId,
-          "librarian",
+          "sentinel",
           assistant.assistant_id
         );
 
@@ -60,14 +64,14 @@ export async function POST(req: NextRequest) {
           reply: response.content ?? "No response generated.",
         });
       } catch (err) {
-        console.error("Backboard librarian error, falling back to Gemini:", err);
+        console.error("Backboard sentinel (via librarian) error, falling back to Gemini:", err);
       }
     }
 
-    const reply = await generateLibrarianResponse(graphState, message);
+    const reply = await generateSentinelResponse(graphState, message);
     return NextResponse.json({ reply });
   } catch (error) {
-    console.error("Librarian API error:", error);
+    console.error("Librarian (deprecated) API error:", error);
     return NextResponse.json(
       { error: "Failed to generate response" },
       { status: 500 }

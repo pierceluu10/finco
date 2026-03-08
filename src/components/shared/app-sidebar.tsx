@@ -16,7 +16,7 @@ import type {
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
-type AgentType = "librarian" | "simulator" | "sentinel";
+type AgentType = "sentinel" | "simulator" | "planner";
 type SidebarTab = "dashboard" | "agents" | "financials";
 
 type FormNodeType = "income" | "debt" | "investment" | "savings" | "expense" | "buffer";
@@ -111,35 +111,35 @@ const AGENTS: {
   alertCount?: number;
 }[] = [
   {
-    id: "librarian",
-    label: "Librarian",
-    color: "#7F7FFA",
+    id: "sentinel",
+    label: "Sentinel",
+    color: "#5B9CF5",
     active: true,
     description:
-      "Analyzes your ecosystem and answers questions about your financial picture.",
-    lastActivity: "Analyzed 6 nodes. Idle cash detected in buffer.",
-    lastTimestamp: "2 min ago",
+      "Your financial supervisor. Explains your graph, writes alerts, detects suspicious activity, and guides you through pressure points.",
+    lastActivity: "Monitoring your ecosystem. 1 alert active.",
+    lastTimestamp: "Just now",
+    alertCount: 1,
   },
   {
     id: "simulator",
     label: "Simulator",
-    color: "#a78bfa",
+    color: "#7AAFDA",
     active: false,
     description:
-      "Models the impact of financial changes across every connected node in real time.",
+      "Models the impact of financial changes and explains what happened in clear before/after terms.",
     lastActivity: "Last simulation ran 4 minutes ago.",
     lastTimestamp: "4 min ago",
   },
   {
-    id: "sentinel",
-    label: "Sentinel",
-    color: "#ffe040",
+    id: "planner",
+    label: "Planner",
+    color: "#5B7FC5",
     active: false,
     description:
-      "Monitors your ecosystem continuously and alerts you when something needs attention.",
-    lastActivity: "1 alert active. Emergency runway below threshold.",
-    lastTimestamp: "12 min ago",
-    alertCount: 1,
+      "Plans your financial future: emergency funds, first home savings, debt payoff, TFSA/RRSP/FHSA, and curated ETF suggestions.",
+    lastActivity: "Ready to help with your financial goals.",
+    lastTimestamp: "Idle",
   },
 ];
 

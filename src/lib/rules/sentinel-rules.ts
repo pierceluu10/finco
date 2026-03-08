@@ -149,5 +149,44 @@ export function checkSentinelRules(
     });
   }
 
+  // suspicious_duplicates: multiple expense nodes with the exact same monthly flow (potential double charges)
+  const expenseFlows = nodes
+    .filter((n) => n.type === "expense" && n.monthlyFlow > 0)
+    .map((n) => ({ label: n.label, amount: n.monthlyFlow }));
+  const amountCounts = new Map<number, string[]>();
+  for (const e of expenseFlows) {
+    const existing = amountCounts.get(e.amount) ?? [];
+    existing.push(e.label);
+    amountCounts.set(e.amount, existing);
+  }
+  amountCounts.forEach((labels, amount) => {
+    if (labels.length >= 2) {
+      triggered.push({
+        ruleId: "suspicious_duplicates",
+        description:
+          `${labels.length} expense nodes have the same monthly amount ($${amount}): ${labels.join(", ")}. Possible duplicate charges.`,
+      });
+    }
+  });
+
+  // idle_cash_large: account/savings node with > $10,000 and no outbound flows to investments
+  for (const node of nodes) {
+    if (
+      (node.type === "account" || node.type === "savings") &&
+      node.currentValue > 10000
+    ) {
+      const hasInvestmentFlow = flows.some(
+        (f) => f.source === node.id && nodes.find((n) => n.id === f.target)?.type === "investment"
+      );
+      if (!hasInvestmentFlow) {
+        triggered.push({
+          ruleId: "idle_cash_large",
+          description:
+            `"${node.label}" holds $${node.currentValue} with no flows directed toward investments`,
+        });
+      }
+    }
+  }
+
   return triggered;
 }

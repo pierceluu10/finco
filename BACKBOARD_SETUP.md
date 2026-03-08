@@ -2,16 +2,15 @@
 
 ## Overview
 
-Finco uses [Backboard.io](https://backboard.io) as the **persistent AI runtime
-layer** for three financial agents. Backboard provides:
+Finco uses [Backboard.io](https://backboard.io) as the **persistent AI runtime layer** for three financial agents. Backboard provides:
 
 - Assistants with persistent system prompts
 - Per-user threads that survive sessions
-- Memory across conversations (for the Librarian)
+- Memory across conversations (Sentinel and Planner)
 - Tool-calling bridge to deterministic app logic
+- Streaming support for progressive response rendering
 
-**Backboard is NOT the source of truth for financial data.** Supabase holds all
-structured data. Backboard only handles conversational AI.
+**Backboard is NOT the source of truth for financial data.** Supabase holds all structured data. Backboard only handles conversational AI.
 
 ## Environment Variable
 
@@ -29,27 +28,24 @@ Get your API key from [Backboard Dashboard → Settings → API Keys](https://ap
 
 ### Three Assistants
 
-| Assistant | Backboard Name | Purpose | Memory |
-|---|---|---|---|
-| Librarian | `finco-librarian` | Answers graph-grounded financial questions | Auto |
-| Simulator | `finco-simulator` | Explains deterministic before/after changes | Off |
-| Sentinel | `finco-sentinel` | Writes alerts for triggered deterministic rules | Off |
+| Assistant | Backboard Name | Purpose | Memory | Web Search |
+|---|---|---|---|---|
+| Sentinel | `finco-sentinel` | Graph supervisor, explainer, alert writer, anomaly detector | Auto | Auto |
+| Simulator | `finco-simulator` | Explains deterministic before/after changes | Off | Off |
+| Planner | `finco-planner` | Future planning, readiness, goals, curated ETFs | Auto | Auto |
 
 ### Assistant Creation Strategy
 
-Assistants are created **automatically on first use** via a get-or-create
-pattern:
+Assistants are created **automatically on first use** via a get-or-create pattern:
 
-1. On the first API call for an agent, the server lists all Backboard
-   assistants via `GET /assistants`
+1. On the first API call for an agent, the server lists all Backboard assistants via `GET /assistants`
 2. If an assistant with the correct name exists, it is reused
 3. If not, it is created with the exact system prompt and tool definitions
 4. The assistant ID is cached in memory for the server process lifetime
 
 ### Thread Persistence Model
 
-Each user gets **one thread per agent** (3 threads total). Thread mappings are
-stored in Supabase:
+Each user gets **one thread per agent** (3 threads total). Thread mappings are stored in Supabase:
 
 ```sql
 CREATE TABLE user_agent_threads (
@@ -64,81 +60,51 @@ CREATE TABLE user_agent_threads (
 );
 ```
 
-On each agent call:
-1. Resolve the authenticated user's Supabase UUID
-2. Look up `user_agent_threads` for `(user_id, agent_name)`
-3. If found, reuse the thread
-4. If not, create a new Backboard thread and persist the mapping
-
 ### Memory Policy
 
 | Agent | Memory | Reason |
 |---|---|---|
-| Librarian | `Auto` | Benefits from remembering what the user explored |
+| Sentinel | `Auto` | Benefits from remembering what the user explored and asked about |
 | Simulator | `off` | Stateless explanation of a single change |
-| Sentinel | `off` | Stateless alert writing for current triggered rules |
+| Planner | `Auto` | Benefits from remembering user goals and preferences |
+
+## Streaming
+
+The Backboard client supports streaming via `addMessageStream()`. When `stream: "true"` is sent, Backboard returns an SSE stream that can be piped directly to the client for progressive rendering.
+
+The chat modal detects `text/event-stream` content type and renders chunks progressively instead of waiting for the full response.
 
 ## Deterministic vs AI Responsibilities
 
-### Deterministic (our app/backend)
+### Deterministic (app backend)
 
 - Graph state management
-- Simulation engine (`src/lib/simulation.ts`)
-- Forecast engine (`src/lib/forecast.ts`)
-- Anomaly detection (`src/lib/anomaly.ts`)
-- Sentinel rules engine (`src/lib/rules/sentinel-rules.ts`)
+- Financial metric calculations
+- Sentinel rules engine (7 rules)
+- Investment readiness checks
+- Goal timeline estimates
+- ETF catalog filtering and ranking
+- Simulator output validation
 - Dashboard summary calculations
-- All financial math
 
 ### AI (Backboard)
 
-- Natural language question answering (Librarian)
-- Explaining simulation results in plain language (Simulator)
-- Writing human-readable alerts from triggered rules (Sentinel)
-
-**The AI never invents financial data. Every response is grounded in
-deterministic outputs.**
-
-## Tool Calling
-
-The Librarian assistant has access to these tools:
-
-| Tool | Description |
-|---|---|
-| `get_full_graph_state` | Returns all nodes, flows, and totals |
-| `get_node_detail` | Returns a specific node with connected flows |
-| `get_dashboard_summary` | Returns income, obligations, savings, runway, debt ratio |
-
-When the Librarian requests a tool, our backend executes it using
-deterministic logic (`src/lib/backboard/tools.ts`) and submits the result
-back to Backboard.
+- Graph-grounded Q&A (Sentinel)
+- Writing human-readable alerts (Sentinel)
+- Explaining simulation results (Simulator)
+- Planning advice and ETF context (Planner)
 
 ## File Structure
 
 ```
 src/lib/backboard/
-  client.ts       — HTTP client for Backboard REST API
-  assistants.ts   — Assistant definitions, system prompts, get-or-create
+  client.ts       — HTTP client with streaming support
+  assistants.ts   — Agent configs, system prompts, get-or-create
   threads.ts      — Thread persistence with Supabase, user resolution
   tools.ts        — Tool definitions and deterministic handlers
-  formatters.ts   — Exact message formatters per agent specification
+  formatters.ts   — Message formatters per agent specification
+  validators.ts   — Output validation (Simulator structure check)
 ```
-
-## API Routes
-
-| Route | Agent | Input |
-|---|---|---|
-| `POST /api/ai/agent` | Any (via `agent` field) | `{ agent, message, graphState?, nodes?, flows? }` |
-| `POST /api/ai/librarian` | Librarian | `{ graphState, message }` |
-| `POST /api/ai/simulator` | Simulator | `{ beforeNodes, afterNodes, beforeTotals, afterTotals, changedNode }` |
-| `POST /api/ai/sentinel` | Sentinel | `{ nodes, flows }` |
-
-## Graceful Degradation
-
-If `BACKBOARD_API_KEY` is not set or the Backboard API returns an error,
-all agent routes **fall back to the Gemini implementation** in
-`src/lib/gemini.ts`. The app never breaks — it degrades to the previous
-Gemini-based agents.
 
 ## Local Development
 
@@ -147,3 +113,4 @@ Gemini-based agents.
 3. Add `BACKBOARD_API_KEY=<key>` to `.env.local`
 4. Start the dev server: `npm run dev`
 5. The three assistants will be auto-created on first agent API call
+6. Thread mappings persist in Supabase — each user gets one thread per agent

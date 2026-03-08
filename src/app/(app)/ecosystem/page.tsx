@@ -26,7 +26,7 @@ import type {
   ParsedCsvEdge,
 } from "@/components/shared/app-sidebar";
 
-type AgentType = "librarian" | "simulator" | "sentinel";
+type AgentType = "sentinel" | "simulator" | "planner";
 
 const STORAGE_KEY = "finco-sidebar-collapsed";
 const ONBOARDING_STORAGE_KEY = "finco-onboarding-data";
@@ -373,12 +373,13 @@ function EcosystemDashboard() {
         />
 
         <AgentChatModal
-          agent={agentChatAgent ?? "librarian"}
+          agent={agentChatAgent ?? "sentinel"}
           open={agentChatAgent !== null}
           onClose={() => setAgentChatAgent(null)}
           financialNodes={graph.financialNodes}
           financialFlows={graph.financialFlows}
           nodeMap={graph.nodeMap}
+          selectedNodeId={graph.selectedNodeId ?? undefined}
         />
 
         {toast && (

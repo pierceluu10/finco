@@ -208,6 +208,41 @@ export async function addMessage(
   return response;
 }
 
+/**
+ * Streaming variant of addMessage. Sends `stream: "true"` and returns
+ * the raw Response so the caller can pipe the SSE body to the client.
+ */
+export async function addMessageStream(
+  threadId: string,
+  content: string,
+  options?: { memory?: "Auto" | "off" | "Readonly" }
+): Promise<Response> {
+  const apiKey = getApiKey();
+  const data: Record<string, string> = {
+    content,
+    stream: "true",
+  };
+  if (options?.memory) data.memory = options.memory;
+
+  const params = new URLSearchParams(data);
+
+  const res = await fetch(`${BACKBOARD_BASE_URL}/threads/${threadId}/messages`, {
+    method: "POST",
+    headers: {
+      "X-API-Key": apiKey,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Backboard streaming API ${res.status}: ${body}`);
+  }
+
+  return res;
+}
+
 export async function submitToolOutputs(
   threadId: string,
   runId: string,

@@ -4,43 +4,37 @@
 
 Finco has three AI agents backed by Backboard.io (with Gemini fallback):
 
-1. **Librarian** — answers questions about the user's financial graph
+1. **Sentinel** — primary financial supervisor, graph explainer, alert writer, anomaly detector
 2. **Simulator** — explains deterministic before/after graph changes
-3. **Sentinel** — writes alerts for triggered deterministic rules
+3. **Planner** — future-planning agent for goals, readiness, timelines, and curated ETFs
 
-All three agents follow a strict separation: **deterministic engines handle
-math, AI agents handle language.**
+The Librarian has been **merged into the Sentinel**. The Sentinel now handles both graph explanation and alert writing.
+
+All agents follow a strict separation: **deterministic engines handle math, AI agents handle language.**
 
 ## Agent Details
 
-### 1. Finco Librarian
+### 1. Finco Sentinel (Primary Agent)
 
-**Purpose:** Answer questions about the user's financial graph.
+**Purpose:** Personal financial supervisor. Replaces the former Librarian.
+
+**Roles:**
+- Graph-aware explainer (answers questions about nodes, flows, structure)
+- Alert writer (translates triggered rules into clear alerts)
+- Suspicious activity detector (flags anomalies found by the deterministic engine)
+- Structural pressure-point guide (identifies areas of financial strain)
 
 **Constraints:**
-- Must always use the full graph state
+- Must always use the full graph state and calculated metrics
 - Graph-grounded only — no generic advice
+- Never invents anomalies or fabricates values
 - Maximum 4 sentences unless the user asks for more
 - Memory enabled (remembers across conversations)
+- Web search enabled (for Canadian financial program info)
 
-**Message format sent to Backboard:**
-```
-CURRENT GRAPH STATE:
-Nodes:
+**Delegation:** If the user asks about future planning, ETFs, or goal timelines, Sentinel suggests they speak to the Planner.
 
-<id> <type> <label> <amount> <currency> <metadata>
-(one line per node)
-
-Flows:
-
-<source label> → <target label> <amount> <frequency> flow
-(one line per flow)
-
-USER MESSAGE:
-<the user's actual message>
-```
-
-**Route:** `POST /api/ai/librarian` and `POST /api/ai/agent` with `agent: "librarian"`
+**Route:** `POST /api/ai/sentinel` and `POST /api/ai/agent` with `agent: "sentinel"`
 
 ### 2. Finco Simulator
 
@@ -51,46 +45,57 @@ USER MESSAGE:
 - Never performs math itself — only explains results
 - Not conversational — one response per simulation
 - Memory disabled
-
-**Message format sent to Backboard:**
-```
-BEFORE STATE:
-Nodes:
-
-<id> <type> <label> <amount> <status>
-(one per node)
-
-Total income: <value>
-Total obligations: <value>
-Remaining cash: <value>
-
-AFTER STATE:
-Nodes:
-
-<id> <type> <label> <amount> <status>
-(one per node, status: healthy / warning / critical)
-
-Total income: <value>
-Total obligations: <value>
-Remaining cash: <value>
-
-CHANGED NODE:
-<node label> changed from <old value> to <new value>
-```
+- Output validated: must follow 4-line structure (what changed, what was affected, observation, next step)
 
 **Route:** `POST /api/ai/simulator`
 
-### 3. Finco Sentinel
+### 3. Finco Planner
 
-**Purpose:** Write alerts for already-triggered deterministic rules.
+**Purpose:** Future-planning agent for financial goals.
+
+**Scope:**
+- First home savings (FHSA)
+- Emergency fund planning
+- Debt payoff sequencing
+- TFSA / RRSP / FHSA contribution planning
+- Major purchase planning
+- Investment readiness assessment
+- Curated ETF suggestions (from internal dataset only)
 
 **Constraints:**
-- Never detects rules itself — the rules engine does
-- Only called when at least one rule is triggered
-- One alert per triggered rule, no more, no less
-- Memory disabled
+- Grounded in user profile, graph summary, and deterministic readiness checks
+- ETF recommendations come from `src/data/etfs/canadian-etfs.json` only
+- If readiness checks show user is not ready to invest, says so clearly
+- No tax advice, legal advice, or guaranteed return projections
+- Memory enabled
+- Web search enabled (for general Canadian financial program info)
 
-**Rules engine checks (in `src/lib/rules/sentinel-rules.ts`):**
+**Delegation:** If the user asks about current graph structure or alerts, Planner suggests they ask the Sentinel.
+
+**Route:** `POST /api/ai/planner` and `POST /api/ai/agent` with `agent: "planner"`
+
+## Tool Calling
+
+### Sentinel Tools
+
+| Tool | Returns |
+|---|---|
+| `get_full_graph_state` | All nodes, flows, and aggregate totals |
+| `get_node_detail` | Specific node with inbound/outbound flows |
+| `get_dashboard_summary` | Income, obligations, savings, runway, debt ratio |
+
+### Planner Tools
+
+| Tool | Returns |
+|---|---|
+| `get_readiness_check` | Investment readiness result from deterministic engine |
+| `get_etf_recommendations` | Curated ETFs filtered by risk and account type |
+| `get_timeline_estimate` | Months-to-goal estimates |
+| `get_dashboard_summary` | Income, obligations, savings, runway, debt ratio |
+
+## Sentinel Rules Engine
+
+Rules checked in `src/lib/rules/sentinel-rules.ts`:
 
 | Rule ID | Condition |
 |---|---|
@@ -99,58 +104,17 @@ CHANGED NODE:
 | `high_debt_ratio` | monthly debt / monthly income > 50% |
 | `no_investments` | zero investment nodes in graph |
 | `negative_cashflow` | income - obligations < 0 |
-
-**Message format sent to Backboard:**
-```
-CURRENT GRAPH STATE:
-Nodes:
-
-<id> <type> <label> <amount> <currency> <metadata>
-
-Flows:
-
-<source> → <target> <amount> <frequency>
-
-Calculated values:
-
-Total monthly income: <value>
-Total monthly obligations: <value>
-Total savings balance: <value>
-Emergency runway: <value> months
-Debt to income ratio: <value>
-
-TRIGGERED RULES:
-
-<rule id>: <plain description>
-(one per rule)
-```
-
-**Route:** `POST /api/ai/sentinel`
-
-## Tool Calling (Librarian only)
-
-The Librarian has access to server-side tools:
-
-| Tool | Returns |
-|---|---|
-| `get_full_graph_state` | All nodes, flows, and aggregate totals |
-| `get_node_detail` | Specific node with inbound/outbound flows |
-| `get_dashboard_summary` | Income, obligations, savings, runway, debt ratio |
-
-Tool execution flow:
-1. Librarian requests a tool via Backboard
-2. Our backend executes it deterministically
-3. Results are submitted back to Backboard
-4. Librarian continues its response with the data
+| `suspicious_duplicates` | multiple expense nodes with identical monthly amounts |
+| `idle_cash_large` | account/savings node with > $10,000 and no investment flows |
 
 ## Route Responsibilities
 
-| Route | Auth | Backboard Thread | Deterministic Context | Memory |
+| Route | Auth | Thread | Context | Memory |
 |---|---|---|---|---|
 | `/api/ai/agent` | Session check | Per-user per-agent | Graph state from request | Per agent |
-| `/api/ai/librarian` | Session check | Librarian thread | Graph state from request | Auto |
+| `/api/ai/sentinel` | Session check | Sentinel thread | Graph + metrics + rules + selected node | Auto |
 | `/api/ai/simulator` | Session check | Simulator thread | Before/after from request | Off |
-| `/api/ai/sentinel` | Session check | Sentinel thread | Rules engine output | Off |
+| `/api/ai/planner` | Session check | Planner thread | Profile + graph + readiness | Auto |
 
 ## Graceful Degradation
 
@@ -162,24 +126,25 @@ Request → Is BACKBOARD_API_KEY set?
   └─ No → Use Gemini directly
 ```
 
-Both Backboard and Gemini use the same system prompts, so responses are
-consistent regardless of which backend is active.
-
 ## File Map
 
 | File | Responsibility |
 |---|---|
-| `src/lib/backboard/client.ts` | HTTP client for Backboard REST API |
-| `src/lib/backboard/assistants.ts` | Assistant definitions, exact system prompts |
+| `src/lib/backboard/client.ts` | HTTP client for Backboard REST API (incl. streaming) |
+| `src/lib/backboard/assistants.ts` | Agent configs, system prompts, get-or-create |
 | `src/lib/backboard/threads.ts` | Thread persistence, user resolution |
 | `src/lib/backboard/tools.ts` | Tool definitions and deterministic handlers |
 | `src/lib/backboard/formatters.ts` | Message formatters per agent spec |
-| `src/lib/rules/sentinel-rules.ts` | Deterministic rules engine (5 rules) |
+| `src/lib/backboard/validators.ts` | Output validation (Simulator 4-line check) |
+| `src/lib/rules/sentinel-rules.ts` | Deterministic rules engine (7 rules) |
+| `src/lib/planner/readiness.ts` | Investment readiness engine |
+| `src/lib/planner/timelines.ts` | Goal timeline estimation engine |
+| `src/lib/etf/etf-catalog.ts` | Curated ETF catalog with filtering/ranking |
 | `src/lib/gemini.ts` | Gemini fallback implementations |
-| `src/app/api/ai/agent/route.ts` | Unified agent route (all three) |
-| `src/app/api/ai/librarian/route.ts` | Dedicated Librarian route |
-| `src/app/api/ai/simulator/route.ts` | Dedicated Simulator route |
+| `src/app/api/ai/agent/route.ts` | Unified agent route |
 | `src/app/api/ai/sentinel/route.ts` | Dedicated Sentinel route |
+| `src/app/api/ai/simulator/route.ts` | Dedicated Simulator route |
+| `src/app/api/ai/planner/route.ts` | Dedicated Planner route |
 
 ## Testing Agents Locally
 
@@ -188,15 +153,21 @@ consistent regardless of which backend is active.
 - Supabase running with `user_agent_threads` table
 - `BACKBOARD_API_KEY` in `.env.local`
 
-### Test the Librarian
+### Test the Sentinel
 
 ```bash
-curl -X POST http://localhost:3000/api/ai/agent \
+curl -X POST http://localhost:3000/api/ai/sentinel \
   -H "Content-Type: application/json" \
   -d '{
-    "agent": "librarian",
-    "message": "What is my total monthly income?",
-    "graphState": "NODES:\n- id: salary | type: income | label: Salary | amount: 8500"
+    "nodes": [
+      {"id":"1","type":"income","label":"Salary","currentValue":0,"monthlyFlow":5000,"metadata":{}},
+      {"id":"2","type":"debt","label":"Mortgage","currentValue":300000,"monthlyFlow":3000,"metadata":{}},
+      {"id":"3","type":"savings","label":"Emergency","currentValue":2000,"monthlyFlow":200,"metadata":{}}
+    ],
+    "flows": [
+      {"id":"f1","source":"1","target":"2","amount":3000,"frequency":"monthly"}
+    ],
+    "message": "What should I pay attention to?"
   }'
 ```
 
@@ -214,19 +185,17 @@ curl -X POST http://localhost:3000/api/ai/simulator \
   }'
 ```
 
-### Test the Sentinel
+### Test the Planner
 
 ```bash
-curl -X POST http://localhost:3000/api/ai/sentinel \
+curl -X POST http://localhost:3000/api/ai/planner \
   -H "Content-Type: application/json" \
   -d '{
     "nodes": [
       {"id":"1","type":"income","label":"Salary","currentValue":0,"monthlyFlow":5000,"metadata":{}},
-      {"id":"2","type":"debt","label":"Mortgage","currentValue":300000,"monthlyFlow":3000,"metadata":{}},
-      {"id":"3","type":"savings","label":"Emergency","currentValue":2000,"monthlyFlow":200,"metadata":{}}
+      {"id":"2","type":"savings","label":"Emergency","currentValue":8000,"monthlyFlow":500,"metadata":{}}
     ],
-    "flows": [
-      {"id":"f1","source":"1","target":"2","amount":3000,"frequency":"monthly"}
-    ]
+    "flows": [],
+    "message": "Am I ready to start investing?"
   }'
 ```

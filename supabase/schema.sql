@@ -78,6 +78,35 @@ CREATE TABLE IF NOT EXISTS simulations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- User financial profile (drives graph, planning, and agent context)
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  first_name TEXT,
+  age_range TEXT CHECK (age_range IS NULL OR age_range IN ('18-24', '25-34', '35-44', '45-54', '55-64', '65+')),
+  province TEXT,
+  currency TEXT NOT NULL DEFAULT 'CAD',
+  net_monthly_income NUMERIC(12, 2),
+  pay_frequency TEXT CHECK (pay_frequency IS NULL OR pay_frequency IN ('weekly', 'biweekly', 'semi-monthly', 'monthly')),
+  income_stability TEXT CHECK (income_stability IS NULL OR income_stability IN ('stable', 'variable', 'seasonal')),
+  housing_status TEXT CHECK (housing_status IS NULL OR housing_status IN ('rent', 'own', 'mortgage', 'living-with-family', 'other')),
+  monthly_housing_cost NUMERIC(12, 2),
+  monthly_debt_payments NUMERIC(12, 2),
+  monthly_recurring_bills NUMERIC(12, 2),
+  monthly_subscriptions NUMERIC(12, 2),
+  emergency_fund_target_months INTEGER NOT NULL DEFAULT 6,
+  investing_goal TEXT,
+  risk_comfort TEXT CHECK (risk_comfort IS NULL OR risk_comfort IN ('low', 'moderate', 'high')),
+  preferred_account_types TEXT[] DEFAULT '{}',
+  contribution_priority_order TEXT[] DEFAULT '{}',
+  employment_type TEXT CHECK (employment_type IS NULL OR employment_type IN ('full-time', 'part-time', 'self-employed', 'contract', 'retired', 'student')),
+  household_setup TEXT CHECK (household_setup IS NULL OR household_setup IN ('single', 'couple', 'family')),
+  known_upcoming_large_expenses TEXT,
+  current_investment_experience TEXT CHECK (current_investment_experience IS NULL OR current_investment_experience IN ('none', 'beginner', 'intermediate', 'advanced')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Backboard agent thread mappings
 CREATE TABLE IF NOT EXISTS user_agent_threads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -100,3 +129,4 @@ CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_simulations_user ON simulations(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_agent_threads_user ON user_agent_threads(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);

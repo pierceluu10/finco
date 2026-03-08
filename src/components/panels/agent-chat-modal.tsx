@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, Loader2 } from "lucide-react";
 import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
 
-type AgentType = "librarian" | "simulator" | "sentinel";
+type AgentType = "sentinel" | "simulator" | "planner";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -19,29 +19,33 @@ interface AgentChatModalProps {
   financialNodes: FinancialNodeData[];
   financialFlows: FinancialFlowData[];
   nodeMap: Map<string, FinancialNodeData>;
+  selectedNodeId?: string;
 }
 
 const AGENT_META: Record<
   AgentType,
-  { label: string; color: string; statusLabel: string; active: boolean }
+  { label: string; color: string; statusLabel: string; active: boolean; thinkingText: string }
 > = {
-  librarian: {
-    label: "Librarian",
-    color: "#7F7FFA",
+  sentinel: {
+    label: "Sentinel",
+    color: "#5B9CF5",
     statusLabel: "Active",
     active: true,
+    thinkingText: "Analyzing your graph...",
   },
   simulator: {
     label: "Simulator",
-    color: "#a78bfa",
+    color: "#7AAFDA",
     statusLabel: "Idle",
     active: false,
+    thinkingText: "Comparing changes...",
   },
-  sentinel: {
-    label: "Sentinel",
-    color: "#ffe040",
+  planner: {
+    label: "Planner",
+    color: "#5B7FC5",
     statusLabel: "Idle",
     active: false,
+    thinkingText: "Reviewing your planning context...",
   },
 };
 
@@ -87,17 +91,19 @@ export function AgentChatModal({
   financialNodes,
   financialFlows,
   nodeMap,
+  selectedNodeId,
 }: AgentChatModalProps) {
-  const meta = AGENT_META[agent];
+  const meta = AGENT_META[agent] ?? AGENT_META.sentinel;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingText]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
@@ -107,6 +113,7 @@ export function AgentChatModal({
     setMessages([]);
     setInput("");
     setLoading(false);
+    setStreamingText("");
   }, [agent]);
 
   const sendMessage = useCallback(async () => {
@@ -121,32 +128,58 @@ export function AgentChatModal({
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+    setStreamingText("");
 
     try {
-      const graphState = serializeGraphState(
-        financialNodes,
-        financialFlows,
-        nodeMap
-      );
+      const graphState = serializeGraphState(financialNodes, financialFlows, nodeMap);
+
+      const requestBody: Record<string, unknown> = {
+        agent,
+        graphState,
+        message: trimmed,
+        nodes: financialNodes,
+        flows: financialFlows,
+      };
+
+      if (selectedNodeId) {
+        requestBody.selectedNodeId = selectedNodeId;
+      }
 
       const res = await fetch("/api/ai/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agent,
-          graphState,
-          message: trimmed,
-          nodes: financialNodes,
-          flows: financialFlows,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) throw new Error("API request failed");
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.reply, timestamp: new Date() },
-      ]);
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      if (contentType.includes("text/event-stream") && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          accumulated += chunk;
+          setStreamingText(accumulated);
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: accumulated, timestamp: new Date() },
+        ]);
+        setStreamingText("");
+      } else {
+        const data = await res.json();
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: data.reply, timestamp: new Date() },
+        ]);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -158,8 +191,9 @@ export function AgentChatModal({
       ]);
     } finally {
       setLoading(false);
+      setStreamingText("");
     }
-  }, [input, loading, financialNodes, financialFlows, nodeMap, agent]);
+  }, [input, loading, financialNodes, financialFlows, nodeMap, agent, selectedNodeId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -175,10 +209,8 @@ export function AgentChatModal({
       className="fixed inset-0 z-[100] flex items-center justify-center"
       onClick={onClose}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.7)" }} />
 
-      {/* Modal */}
       <div
         className="relative font-sans"
         style={{
@@ -233,12 +265,8 @@ export function AgentChatModal({
             onClick={onClose}
             className="p-1 rounded-md transition"
             style={{ color: "#6b6b9a" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.color = "#e8e8ff")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.color = "#6b6b9a")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e8ff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b9a")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -249,7 +277,7 @@ export function AgentChatModal({
           className="flex-1 overflow-y-auto px-5 py-4 space-y-3"
           style={{ maxHeight: 380, minHeight: 160 }}
         >
-          {messages.length === 0 && (
+          {messages.length === 0 && !streamingText && (
             <div className="flex items-center justify-center py-10">
               <p
                 className="font-sans text-center"
@@ -267,7 +295,7 @@ export function AgentChatModal({
               className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
             >
               <div
-                className="font-sans"
+                className="font-sans whitespace-pre-wrap"
                 style={{
                   maxWidth: "75%",
                   padding: "10px 14px",
@@ -299,7 +327,30 @@ export function AgentChatModal({
             </div>
           ))}
 
-          {loading && (
+          {/* Streaming text */}
+          {streamingText && (
+            <div className="flex flex-col items-start">
+              <div
+                className="font-sans whitespace-pre-wrap"
+                style={{
+                  maxWidth: "75%",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  lineHeight: 1.55,
+                  background: `${meta.color}0F`,
+                  border: `1px solid ${meta.color}26`,
+                  color: "#c8c8e8",
+                }}
+              >
+                {streamingText}
+              </div>
+            </div>
+          )}
+
+          {/* Typing indicator */}
+          {loading && !streamingText && (
             <div className="flex items-start">
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
@@ -316,7 +367,7 @@ export function AgentChatModal({
                   className="font-sans"
                   style={{ fontSize: 11, color: "#6b6b9a" }}
                 >
-                  Thinking...
+                  {meta.thinkingText}
                 </span>
               </div>
             </div>

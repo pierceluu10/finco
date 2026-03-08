@@ -9,21 +9,17 @@ import type { BackboardToolDef, BackboardToolCall } from "./client";
 import type { FinancialNodeData, FinancialFlowData } from "@/types/graph";
 
 // ---------------------------------------------------------------------------
-// Tool definitions (attached to assistants at creation time)
+// Tool definitions — Sentinel (graph inspection tools)
 // ---------------------------------------------------------------------------
 
-export const AGENT_TOOLS: BackboardToolDef[] = [
+export const SENTINEL_TOOLS: BackboardToolDef[] = [
   {
     type: "function",
     function: {
       name: "get_full_graph_state",
       description:
         "Returns the complete financial graph including all nodes, flows, and aggregate values",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -35,10 +31,7 @@ export const AGENT_TOOLS: BackboardToolDef[] = [
       parameters: {
         type: "object",
         properties: {
-          node_id: {
-            type: "string",
-            description: "The ID of the node to look up",
-          },
+          node_id: { type: "string", description: "The ID of the node to look up" },
         },
         required: ["node_id"],
       },
@@ -49,15 +42,71 @@ export const AGENT_TOOLS: BackboardToolDef[] = [
     function: {
       name: "get_dashboard_summary",
       description:
-        "Returns the financial dashboard summary: income, obligations, savings, runway, debt ratio, and active alerts",
+        "Returns the financial dashboard summary: income, obligations, savings, runway, debt ratio",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Tool definitions — Planner (readiness + ETF + timeline tools)
+// ---------------------------------------------------------------------------
+
+export const PLANNER_TOOLS: BackboardToolDef[] = [
+  {
+    type: "function",
+    function: {
+      name: "get_readiness_check",
+      description:
+        "Runs deterministic investment readiness checks based on the user's profile and graph metrics",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_etf_recommendations",
+      description:
+        "Returns curated ETF suggestions filtered by the user's risk comfort and account preferences",
       parameters: {
         type: "object",
-        properties: {},
+        properties: {
+          risk_level: { type: "string", description: "low, moderate, or high", enum: ["low", "moderate", "high"] },
+          account_type: { type: "string", description: "TFSA, RRSP, FHSA, RESP, or Non-registered" },
+        },
         required: [],
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_timeline_estimate",
+      description:
+        "Estimates months to reach a savings or investment goal given current contributions",
+      parameters: {
+        type: "object",
+        properties: {
+          goal_type: { type: "string", description: "emergency_fund, first_home, or custom", enum: ["emergency_fund", "first_home", "custom"] },
+          target_amount: { type: "number", description: "Target dollar amount (optional for emergency_fund)" },
+        },
+        required: ["goal_type"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_dashboard_summary",
+      description:
+        "Returns the financial dashboard summary: income, obligations, savings, runway, debt ratio",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
 ];
+
+// Backward-compatible alias
+export const AGENT_TOOLS = SENTINEL_TOOLS;
 
 // ---------------------------------------------------------------------------
 // Graph context passed to handlers
@@ -90,10 +139,14 @@ export function handleToolCall(
       return handleGetNodeDetail(context, args.node_id as string);
     case "get_dashboard_summary":
       return handleGetDashboardSummary(context);
+    case "get_readiness_check":
+      return JSON.stringify({ note: "Readiness data is included in the message payload" });
+    case "get_etf_recommendations":
+      return handleGetEtfRecommendations(args.risk_level as string, args.account_type as string);
+    case "get_timeline_estimate":
+      return JSON.stringify({ note: "Timeline data is included in the message payload" });
     default:
-      return JSON.stringify({
-        error: `Unknown tool: ${toolCall.function.name}`,
-      });
+      return JSON.stringify({ error: `Unknown tool: ${toolCall.function.name}` });
   }
 }
 
@@ -176,6 +229,23 @@ function handleGetDashboardSummary(ctx: GraphContext): string {
     runway_months: Math.round(runway * 10) / 10,
     debt_to_income_ratio: Math.round(debtRatio * 100) / 100,
   });
+}
+
+function handleGetEtfRecommendations(riskLevel?: string, accountType?: string): string {
+  try {
+    // Dynamic import to avoid bundling ETF data in every route
+    const catalog = require("@/lib/etf/etf-catalog");
+    let etfs = catalog.getAllEtfs();
+    if (riskLevel) etfs = catalog.filterEtfsByRisk(riskLevel);
+    if (accountType) {
+      etfs = etfs.filter((e: { account_suitability: string[] }) =>
+        e.account_suitability.includes(accountType)
+      );
+    }
+    return JSON.stringify({ etfs: etfs.slice(0, 5) });
+  } catch {
+    return JSON.stringify({ error: "ETF catalog not available" });
+  }
 }
 
 // ---------------------------------------------------------------------------

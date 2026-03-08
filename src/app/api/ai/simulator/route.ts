@@ -10,6 +10,7 @@ import {
   type NodeStateRow,
   type ChangedNode,
 } from "@/lib/backboard/formatters";
+import { validateSimulatorOutput } from "@/lib/backboard/validators";
 import { generateSimulatorResponse } from "@/lib/gemini";
 
 interface SimulatorRequestBody {
@@ -62,13 +63,27 @@ export async function POST(req: NextRequest) {
           body.changedNode
         );
 
-        const response = await addMessage(threadId, content, {
+        let response = await addMessage(threadId, content, {
           memory: "off",
         });
 
-        return NextResponse.json({
-          reply: response.content ?? "No response generated.",
-        });
+        let reply = response.content ?? "No response generated.";
+        const validation = validateSimulatorOutput(reply);
+
+        if (!validation.valid && validation.correctionPrompt) {
+          try {
+            const retryResponse = await addMessage(threadId, validation.correctionPrompt, {
+              memory: "off",
+            });
+            reply = retryResponse.content ?? validation.cleanedOutput;
+          } catch {
+            reply = validation.cleanedOutput;
+          }
+        } else {
+          reply = validation.cleanedOutput;
+        }
+
+        return NextResponse.json({ reply });
       } catch (err) {
         console.error(
           "Backboard simulator error, falling back to Gemini:",
@@ -78,11 +93,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.graphState && body.message) {
-      const reply = await generateSimulatorResponse(
+      const rawReply = await generateSimulatorResponse(
         body.graphState,
         body.message
       );
-      return NextResponse.json({ reply });
+      const validation = validateSimulatorOutput(rawReply);
+      return NextResponse.json({ reply: validation.cleanedOutput });
     }
 
     return NextResponse.json(

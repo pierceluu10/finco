@@ -1,100 +1,60 @@
-# Finco — Auth0 Setup Guide
+# Finco — Auth0 Setup
 
-## Overview
+Finco uses [Auth0](https://auth0.com) with the `@auth0/nextjs-auth0` v4 SDK for identity management and Universal Login.
 
-Finco uses **Auth0** (Regular Web Application type) for authentication via the
-`@auth0/nextjs-auth0` v4 SDK. Authentication uses **Auth0 Universal Login** —
-no embedded credential forms.
-
-## “Dev Keys” warning
-
-If you see: **“One or more of your connections are currently using Auth0 development keys and should not be used in production”**:
-
-- **Local / development:** This is expected when using a domain like `dev-*.us.auth0.com` or an Auth0 application marked as “Development”. Safe to ignore for localhost and non‑production use.
-- **Production:** Do not use dev keys in production. In the [Auth0 Dashboard](https://manage.auth0.com/):
-  1. Create a **Production** application (or use a production tenant), and  
-  2. Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` in your production environment to that application’s values.
-
-[Auth0 docs: Development vs Production keys](https://auth0.com/docs/get-started/applications/application-types#development-and-production-applications)
-
-## Environment Variables
+## Required Environment Variables
 
 Add these to `.env.local`:
 
-```env
-AUTH0_DOMAIN=dev-4gztmpj5i0lx00gq.us.auth0.com
-AUTH0_CLIENT_ID=<your Auth0 client ID>
-AUTH0_CLIENT_SECRET=<your Auth0 client secret>
-AUTH0_SECRET=<a random 32-byte hex string for session encryption>
+```
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_ID=your_client_id
+AUTH0_CLIENT_SECRET=your_client_secret
+AUTH0_SECRET=<64-char hex string>
 APP_BASE_URL=http://localhost:3000
 ```
 
-### Generating AUTH0_SECRET
+Generate `AUTH0_SECRET`:
 
 ```bash
 openssl rand -hex 32
 ```
 
-### Important
+## Auth0 Dashboard Setup (Local Dev)
 
-- **AUTH0_DOMAIN** must include `.com` (e.g. `dev-xxx.us.auth0.com`).
-- **APP_BASE_URL** replaces any older `AUTH0_BASE_URL` variable.
-- Do **not** use `AUTH0_ISSUER_BASE_URL` — it is not needed with the v4 SDK.
-- Never expose `AUTH0_CLIENT_SECRET` or `AUTH0_SECRET` to the client.
+1. Create a **Regular Web Application** in the Auth0 dashboard.
+2. On the Settings tab, set:
+   - **Allowed Callback URLs**: `http://localhost:3000/auth/callback`
+   - **Allowed Logout URLs**: `http://localhost:3000`
+   - **Allowed Web Origins**: `http://localhost:3000`
+3. Copy the Domain, Client ID, and Client Secret into `.env.local`.
 
-## Auth0 Dashboard Configuration
+## How It Works
 
-Log into [Auth0 Dashboard](https://manage.auth0.com/) and navigate to your
-application settings.
+- **Middleware** (`src/middleware.ts`): Auth0 middleware runs on all matched routes. When Auth0 env vars are missing, it passes through (dev bypass).
+- **Auto-mounted routes**: The SDK middleware automatically provides `/auth/login`, `/auth/logout`, `/auth/callback`, `/auth/profile`.
+- **Universal Login**: Users are redirected to Auth0's hosted login page — no embedded credential forms.
+- **Route protection**: The `(app)/layout.tsx` server component calls `auth0.getSession()`. If no session exists and Auth0 is configured, the user is redirected to `/login`.
+- **Login/Signup pages**: Both redirect to Auth0 Universal Login (`/auth/login`).
 
-### For local development
+## Protected vs Public Routes
 
-| Setting | Value |
-|---|---|
-| **Application Type** | Regular Web Application |
-| **Allowed Callback URLs** | `http://localhost:3000/auth/callback` |
-| **Allowed Logout URLs** | `http://localhost:3000` |
-| **Allowed Web Origins** | `http://localhost:3000` |
+| Route | Access |
+|-------|--------|
+| `/` (landing) | Public |
+| `/login`, `/signup` | Public (redirect to Auth0) |
+| `/ecosystem` | Protected |
+| `/profile` | Protected |
+| `/onboarding` | Protected |
+| `/api/*` | API routes resolve auth internally |
 
-### For production
+## Production Notes
 
-Replace `http://localhost:3000` with your production URL in all three fields.
+- Use a **Production** Auth0 application (not dev keys).
+- Set `APP_BASE_URL` to your production domain.
+- Update Allowed Callback/Logout/Web Origins URLs to match the production domain.
+- `AUTH0_SECRET` must be the same across all instances behind a load balancer.
 
-## Auth Flow
+## Google Calendar Integration (Future)
 
-1. `/login` — redirects to Auth0 Universal Login with `returnTo=/ecosystem`
-2. `/signup` — redirects to Auth0 Universal Login with `screen_hint=signup`
-3. `/auth/callback` — handled automatically by the SDK middleware
-4. `/auth/logout` — handled automatically by the SDK middleware
-
-## Route Protection
-
-### Protected routes (require authentication)
-
-- `/ecosystem`
-- `/dashboard`
-- All routes under `(app)/` layout group
-
-Protection is enforced in `src/app/(app)/layout.tsx` via `auth0.getSession()`.
-If no session exists, the user is redirected to `/login`.
-
-### Public routes
-
-- `/` — landing page
-- `/login` — redirect entry point
-- `/signup` — redirect entry point
-
-### API route protection
-
-All `/api/ai/*` routes attempt to resolve the authenticated user. If Auth0
-is not configured (no `AUTH0_CLIENT_ID` env var), they fall back to a demo
-user ID for local development.
-
-## SDK Architecture
-
-- **`src/lib/auth0.ts`** — creates the Auth0Client singleton
-- **`src/middleware.ts`** — runs `auth0.middleware()` on all non-static routes
-  to handle `/auth/*` routes and session cookies
-- **`src/app/(app)/layout.tsx`** — checks session for protected routes
-- **`src/app/(auth)/login/page.tsx`** — redirects to `/auth/login`
-- **`src/app/(auth)/signup/page.tsx`** — redirects to `/auth/login?screen_hint=signup`
+When Google Calendar is enabled, Auth0 will handle delegated access via a Google Social Connection with extended scopes (`calendar.events`). The backend retrieves the Google access token via Auth0 and makes Calendar API calls on the user's behalf. The user must explicitly approve each calendar event creation.
