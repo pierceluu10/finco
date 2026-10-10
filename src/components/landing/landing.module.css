@@ -1,4 +1,5 @@
 .landing { --ink:#20214a; --body:#575b76; --brand:#4948c9; --canvas:#f9fafc; --lilac:#e8e9fc; --line:#cfd3e6; --white:#fff; --green:#166953; --ease:cubic-bezier(.16,1,.3,1); color:var(--ink); background:var(--canvas); min-height:100vh; color-scheme:light; }
+:global(html):has(.landing),:global(body):has(.landing) { background:#f9fafc; }
 .landing * { box-sizing:border-box; }
 .landing ::selection { color:var(--white); background:var(--brand); }
 .landing a { text-decoration:none; }
