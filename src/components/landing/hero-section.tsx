@@ -1,120 +1,41 @@
-"use client";
+import { ArrowUpRight, Check, GitBranch, ScanLine, SlidersHorizontal } from "lucide-react";
+import { MoneyMap } from "./money-map";
+import styles from "./landing.module.css";
 
-import { motion } from "framer-motion";
-
-function FloatingShareNode({
-  x,
-  y,
-  size = 18,
-  delay = 0,
-  rotation = 0,
-}: {
-  x: string;
-  y: string;
-  size?: number;
-  delay?: number;
-  rotation?: number;
-}) {
-  return (
-    <motion.svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      className="absolute"
-      style={{ left: x, top: y }}
-      initial={{ opacity: 0, rotate: rotation, scale: 0.7 }}
-      animate={{
-        opacity: [0.25, 0.55, 0.25],
-        y: [0, -6, 0],
-        rotate: [rotation, rotation + 8, rotation],
-        scale: [0.9, 1, 0.9],
-      }}
-      transition={{
-        duration: 6 + delay * 0.8,
-        repeat: Infinity,
-        delay,
-        ease: "easeInOut",
-      }}
-    >
-      <path
-        fill="#7F7FFA"
-        d="M17.5 3a3.5 3.5 0 0 0-3.456 4.06L8.143 9.704a3.5 3.5 0 1 0-.01 4.6l5.91 2.65a3.5 3.5 0 1 0 .863-1.805l-5.94-2.662a3.5 3.5 0 0 0 .002-.961l5.948-2.667A3.5 3.5 0 1 0 17.5 3"
-      />
-    </motion.svg>
-  );
-}
+const SIGNUP_PATH = "/auth/login?screen_hint=signup&returnTo=/onboarding";
+const AGENTS = [
+  { name: "Sentinel", job: "See the pressure points.", description: "Spot unusual spending and understand what is putting pressure on your finances.", icon: ScanLine },
+  { name: "Simulator", job: "Try a different tomorrow.", description: "Explore a new expense, a change in income, or another savings contribution before you commit.", icon: SlidersHorizontal },
+  { name: "Planner", job: "Make room for what matters.", description: "Turn your emergency fund, debt payoff, and investing goals into a plan you can follow.", icon: GitBranch },
+];
 
 export function HeroSection() {
-  return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-grid opacity-40" />
-      <div className="absolute inset-0 bg-radial-glow" />
-
-      <FloatingShareNode x="6%" y="14%" delay={0} rotation={-20} size={20} />
-      <FloatingShareNode x="20%" y="26%" delay={1.5} rotation={45} size={14} />
-      <FloatingShareNode x="50%" y="50%" delay={0.8} rotation={-10} size={12} />
-      <FloatingShareNode x="72%" y="18%" delay={0.3} rotation={-70} size={16} />
-      <FloatingShareNode x="90%" y="38%" delay={2.2} rotation={20} size={24} />
-      <FloatingShareNode x="8%" y="68%" delay={1} rotation={-130} size={18} />
-      <FloatingShareNode x="82%" y="62%" delay={1.8} rotation={60} size={14} />
-      <FloatingShareNode x="40%" y="80%" delay={2.5} rotation={-40} size={16} />
-      <FloatingShareNode x="60%" y="85%" delay={0.5} rotation={30} size={20} />
-
-      <div className="relative z-10 mx-auto max-w-[921px] px-6 text-center">
-        <motion.p
-          className="mb-2 font-sans text-[22px] font-bold tracking-[-0.018em] text-finco-blue"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          Welcome to Finco
-        </motion.p>
-
-        <motion.h1
-          className="mb-4 font-sans text-[64px] font-bold leading-[74px] tracking-[-0.01em] text-finco-blue"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          Your Financial Ecosystem.
-        </motion.h1>
-
-        <motion.p
-          className="mb-10 font-sans text-[18px] font-normal leading-relaxed tracking-[-0.01em] text-finco-blue/60"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-        >
-          Visualize where your money comes from and where it goes
-        </motion.p>
-
-        <motion.div
-          className="flex items-center justify-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.85 }}
-            whileHover={{ scale: 1.05, boxShadow: "0 0 24px rgba(127,127,250,0.3)" }}
-            whileTap={{ scale: 0.97 }}
-            className="rounded-full"
-          >
-            <a
-              href="/auth/login?screen_hint=signup&returnTo=/onboarding"
-              className="inline-flex h-[49px] items-center justify-center gap-2 rounded-full bg-finco-blue px-[34px] font-sans text-[16px] font-bold text-black transition-colors hover:bg-finco-blue/90"
-            >
-              Get Started
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3.5 10.5L10.5 3.5M10.5 3.5H4.5M10.5 3.5V9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
-          </motion.div>
-        </motion.div>
+  return <>
+    <section className={styles.hero} aria-labelledby="hero-title">
+      <div className={styles.heroCopy}>
+        <h1 id="hero-title">Give your money a direction.</h1>
+        <p>Income. Everyday spending. Your next big thing. See how it all connects, and find a way forward with Finco.</p>
+        <div className={styles.actions}>
+          <a href={SIGNUP_PATH} className={styles.primary}>Build your ecosystem <ArrowUpRight size={19} aria-hidden="true" /></a>
+          <a href="/ecosystem" className={styles.secondary}>Explore the demo</a>
+        </div>
+        <p className={styles.heroNote}><Check size={16} aria-hidden="true" /> Your whole financial picture, in one place.</p>
+      </div><MoneyMap />
+    </section>
+    <section className={styles.intro} id="how-it-works" aria-labelledby="intro-title">
+      <h2 id="intro-title">The numbers are only<br />half the picture.</h2>
+      <div><p>Finco connects the dots between what comes in, what goes out, and what you want to build. A living map makes the relationships visible.</p>
+        <p>Start with your financial profile or import transactions from a CSV. Then explore your accounts, follow the flow, and see what changes when life does.</p>
+        <a href="/ecosystem" className={styles.textLink}>Take a look inside <ArrowUpRight size={19} aria-hidden="true" /></a>
       </div>
     </section>
-  );
+    <section className={styles.agents} id="your-agents" aria-labelledby="agents-title">
+      <div className={styles.sectionHeading}><h2 id="agents-title">Three agents.<br />One clearer picture.</h2><p>Different perspectives on the same financial ecosystem. The math stays deterministic; the agents help you understand it.</p></div>
+      <div className={styles.agentList}>{AGENTS.map(({ name, job, description, icon: Icon }) => <article key={name} className={styles.agent}>
+        <Icon size={27} strokeWidth={1.5} aria-hidden="true" /><h3>{name}</h3><strong>{job}</strong><p>{description}</p>
+      </article>)}</div>
+    </section>
+    <section className={styles.close} aria-labelledby="close-title"><h2 id="close-title">Your money.<br />A little more understood.</h2><a href={SIGNUP_PATH} className={styles.primary}>Get started with Finco <ArrowUpRight size={19} aria-hidden="true" /></a></section>
+    <footer className={styles.footer}><span>Finco</span><p>A connected view of your financial life.</p><a href="/ecosystem">Explore Finco</a></footer>
+  </>;
 }
