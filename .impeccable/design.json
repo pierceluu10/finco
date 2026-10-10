@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T23:45:31Z",
+  "title": "Design System: Finco Landing",
+  "extensions": {
+    "colorMeta": {
+      "brand": {
+        "role": "primary",
+        "displayName": "Route Indigo",
+        "tonalRamp": [
+          "oklch(15% 0.1944 276.66)",
+          "oklch(26% 0.1944 276.66)",
+          "oklch(38% 0.1944 276.66)",
+          "oklch(49% 0.1944 276.66)",
+          "oklch(61% 0.1944 276.66)",
+          "oklch(72% 0.1944 276.66)",
+          "oklch(84% 0.1944 276.66)",
+          "oklch(95% 0.1944 276.66)"
+        ]
+      },
+      "brand-hover": {
+        "role": "primary",
+        "displayName": "Deep Route Indigo",
+        "tonalRamp": [
+          "oklch(15% 0.1708 275.62)",
+          "oklch(26% 0.1708 275.62)",
+          "oklch(38% 0.1708 275.62)",
+          "oklch(49% 0.1708 275.62)",
+          "oklch(61% 0.1708 275.62)",
+          "oklch(72% 0.1708 275.62)",
+          "oklch(84% 0.1708 275.62)",
+          "oklch(95% 0.1708 275.62)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Midnight Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0744 279.16)",
+          "oklch(26% 0.0744 279.16)",
+          "oklch(38% 0.0744 279.16)",
+          "oklch(49% 0.0744 279.16)",
+          "oklch(61% 0.0744 279.16)",
+          "oklch(72% 0.0744 279.16)",
+          "oklch(84% 0.0744 279.16)",
+          "oklch(95% 0.0744 279.16)"
+        ]
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Slate Text",
+        "tonalRamp": [
+          "oklch(15% 0.0438 278.04)",
+          "oklch(26% 0.0438 278.04)",
+          "oklch(38% 0.0438 278.04)",
+          "oklch(49% 0.0438 278.04)",
+          "oklch(61% 0.0438 278.04)",
+          "oklch(72% 0.0438 278.04)",
+          "oklch(84% 0.0438 278.04)",
+          "oklch(95% 0.0438 278.04)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Cool Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0029 264.54)",
+          "oklch(26% 0.0029 264.54)",
+          "oklch(38% 0.0029 264.54)",
+          "oklch(49% 0.0029 264.54)",
+          "oklch(61% 0.0029 264.54)",
+          "oklch(72% 0.0029 264.54)",
+          "oklch(84% 0.0029 264.54)",
+          "oklch(95% 0.0029 264.54)"
+        ]
+      },
+      "lilac": {
+        "role": "neutral",
+        "displayName": "Map Lilac",
+        "tonalRamp": [
+          "oklch(15% 0.0256 283.49)",
+          "oklch(26% 0.0256 283.49)",
+          "oklch(38% 0.0256 283.49)",
+          "oklch(49% 0.0256 283.49)",
+          "oklch(61% 0.0256 283.49)",
+          "oklch(72% 0.0256 283.49)",
+          "oklch(84% 0.0256 283.49)",
+          "oklch(95% 0.0256 283.49)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Quiet Line",
+        "tonalRamp": [
+          "oklch(15% 0.0265 276.36)",
+          "oklch(26% 0.0265 276.36)",
+          "oklch(38% 0.0265 276.36)",
+          "oklch(49% 0.0265 276.36)",
+          "oklch(61% 0.0265 276.36)",
+          "oklch(72% 0.0265 276.36)",
+          "oklch(84% 0.0265 276.36)",
+          "oklch(95% 0.0265 276.36)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "green": {
+        "role": "secondary",
+        "displayName": "Available Green",
+        "tonalRamp": [
+          "oklch(15% 0.0845 170.37)",
+          "oklch(26% 0.0845 170.37)",
+          "oklch(38% 0.0845 170.37)",
+          "oklch(49% 0.0845 170.37)",
+          "oklch(61% 0.0845 170.37)",
+          "oklch(72% 0.0845 170.37)",
+          "oklch(84% 0.0845 170.37)",
+          "oklch(95% 0.0845 170.37)"
+        ]
+      },
+      "route-line": {
+        "role": "neutral",
+        "displayName": "Routing Lavender",
+        "tonalRamp": [
+          "oklch(15% 0.0678 281.75)",
+          "oklch(26% 0.0678 281.75)",
+          "oklch(38% 0.0678 281.75)",
+          "oklch(49% 0.0678 281.75)",
+          "oklch(61% 0.0678 281.75)",
+          "oklch(72% 0.0678 281.75)",
+          "oklch(84% 0.0678 281.75)",
+          "oklch(95% 0.0678 281.75)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The public landing hero heading."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Landing section and closing headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Agent names."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Hero supporting explanation."
+      },
+      "body-detail": {
+        "displayName": "Body Detail",
+        "purpose": "Longer introduction paragraphs."
+      },
+      "body-compact": {
+        "displayName": "Body Compact",
+        "purpose": "Agent descriptions."
+      },
+      "label": {
+        "displayName": "Action Label",
+        "purpose": "Landing links and action pills."
+      },
+      "navigation": {
+        "displayName": "Navigation",
+        "purpose": "In-page landing navigation links."
+      },
+      "amount": {
+        "displayName": "Financial Amount",
+        "purpose": "Destination values with tabular numerals."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "primary-background-duration",
+        "value": "180ms",
+        "purpose": "Primary action background transition only."
+      },
+      {
+        "name": "landing-ease",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "The observed primary action ease curve."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none; scroll-behavior: auto",
+        "purpose": "Landing override under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "400px"
+      },
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "tablet",
+        "value": "1050px"
+      },
+      {
+        "name": "wide-desktop",
+        "value": "1600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The indigo pill action used to start a financial ecosystem.",
+      "html": "<a class=\"ds-primary\" href=\"/auth/login?screen_hint=signup&amp;returnTo=/onboarding\">Build your ecosystem <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 7h10v10\"/><path d=\"M7 17 17 7\"/></svg></a>",
+      "css": ".ds-primary{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:14px;background:#4948c9;color:#fff;padding:16px 24px;border-radius:100px;font-size:14px;font-weight:700;text-decoration:none;transition:background .18s cubic-bezier(.16,1,.3,1)}.ds-primary:hover{background:#33329f}.ds-primary:focus-visible{outline:3px solid #4948c9;outline-offset:5px;}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+    },
+    {
+      "name": "Secondary Action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A persistent underlined action beside the primary pill.",
+      "html": "<a class=\"ds-secondary\" href=\"/ecosystem\">Explore the demo</a>",
+      "css": ".ds-secondary{font-family:Manrope,sans-serif;color:#20214a;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:5px}.ds-secondary:hover{text-decoration:underline}.ds-secondary:focus-visible{outline:3px solid #4948c9;outline-offset:5px;}"
+    },
+    {
+      "name": "Login Pill",
+      "kind": "button",
+      "refersTo": "button-login",
+      "description": "A quiet outlined entry point for returning users.",
+      "html": "<a class=\"ds-login\" href=\"/auth/login?returnTo=/ecosystem\">Log in</a>",
+      "css": ".ds-login{font-family:Manrope,sans-serif;display:inline-flex;color:#20214a;padding:11px 23px;border:1px solid #cfd3e6;border-radius:100px;font-size:14px;font-weight:700;text-decoration:none}.ds-login:focus-visible{outline:3px solid #4948c9;outline-offset:5px;}"
+    },
+    {
+      "name": "Landing Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-link",
+      "description": "The landing-local logo treatment, in-page links, and login action.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main navigation\"><a class=\"ds-logo\" href=\"/\" aria-label=\"Finco home\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"28\" height=\"28\" viewBox=\"0 0 448 512\" aria-hidden=\"true\"><path fill=\"#4948c9\" d=\"M248 106.6c18.9-9 32-28.3 32-50.6c0-30.9-25.1-56-56-56s-56 25.1-56 56c0 22.3 13.1 41.6 32 50.6v98.8c-2.8 1.3-5.5 2.9-8 4.7l-80.1-45.8c1.6-20.8-8.6-41.6-27.9-52.8C57.2 96 23 105.2 7.5 132S1.2 193 28 208.5c1.3.8 2.6 1.5 4 2.1v90.8c-1.3.6-2.7 1.3-4 2.1C1.2 319-8 353.2 7.5 380s49.7 36 76.5 20.5c19.3-11.1 29.4-32 27.8-52.8l50.5-28.9c-11.5-11.2-19.9-25.6-23.8-41.7l-50.5 29c-2.6-1.8-5.2-3.3-8-4.7v-90.8c2.8-1.3 5.5-2.9 8-4.7l80.1 45.8c-.1 1.4-.2 2.8-.2 4.3c0 22.3 13.1 41.6 32 50.6v98.8c-18.9 9-32 28.3-32 50.6c0 30.9 25.1 56 56 56s56-25.1 56-56c0-22.3-13.1-41.6-32-50.6v-98.8c2.8-1.3 5.5-2.9 8-4.7l80.1 45.8c-1.6 20.8 8.6 41.6 27.8 52.8c26.8 15.5 61 6.3 76.5-20.5s6.3-61-20.5-76.5c-1.3-.8-2.7-1.5-4-2.1v-90.8c1.4-.6 2.7-1.3 4-2.1c26.8-15.5 36-49.7 20.5-76.5s-49.5-36-76.3-20.5c-19.3 11.1-29.4 32-27.8 52.8l-50.6 28.9c11.5 11.2 19.9 25.6 23.8 41.7l50.6-29c2.6 1.8 5.2 3.3 8 4.7v90.8c-2.8 1.3-5.5 2.9-8 4.6l-80.1-45.8c.1-1.4.2-2.8.2-4.3c0-22.3-13.1-41.6-32-50.6v-98.8z\"/></svg><span>Finco</span></a><div class=\"ds-nav-links\"><a href=\"#how-it-works\">How it works</a><a href=\"#your-agents\">Meet your agents</a></div><a class=\"ds-nav-login\" href=\"/auth/login?returnTo=/ecosystem\">Log in</a></nav>",
+      "css": ".ds-nav{font-family:Manrope,sans-serif;max-width:1360px;margin:auto;padding:30px 48px;display:flex;align-items:center;justify-content:space-between;gap:32px;background:#f9fafc;color:#20214a}.ds-nav a{color:inherit;text-decoration:none}.ds-logo{display:flex;align-items:center;gap:10px}.ds-logo span{font-size:24px;font-weight:700;letter-spacing:-.018em}.ds-nav-links{display:flex;gap:38px;font-size:14px;font-weight:600}.ds-nav-links a:hover{text-decoration:underline;text-underline-offset:5px}.ds-nav-login{padding:11px 23px;border:1px solid #cfd3e6;border-radius:100px;font-size:14px;font-weight:700}.ds-nav a:focus-visible{outline:3px solid #4948c9;outline-offset:5px;}@media(max-width:1050px){.ds-nav{padding-inline:32px}}@media(max-width:760px){.ds-nav{padding:22px 24px}.ds-nav-links{display:none}}"
+    },
+    {
+      "name": "Demo Disclosure",
+      "kind": "chip",
+      "refersTo": "demo-tag",
+      "description": "Passive disclosure that the financial example is illustrative.",
+      "html": "<span class=\"ds-demo-tag\">Illustrative demo</span>",
+      "css": ".ds-demo-tag{font-family:Manrope,sans-serif;display:inline-block;color:#575b76;font-size:11px;font-weight:500;padding:5px 8px;border:1px solid #babfe1;border-radius:6px}"
+    },
+    {
+      "name": "Savings Destination",
+      "kind": "card",
+      "refersTo": "destination-savings",
+      "description": "An emphasized route destination with tabular financial amounts.",
+      "html": "<div class=\"ds-savings-destination\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M17 7 7 17\"/><path d=\"M17 17H7V7\"/></svg><div><span>Savings &amp; investing</span><strong>$800</strong></div></div>",
+      "css": ".ds-savings-destination{font-family:Manrope,sans-serif;display:inline-flex;gap:12px;align-items:center;border-radius:14px;background:#4948c9;color:#fff;padding:17px 13px;font-size:11px}.ds-savings-destination>div{display:flex;flex-direction:column;gap:5px}.ds-savings-destination strong{font-size:24px;letter-spacing:-.025em;font-variant-numeric:tabular-nums;font-weight:700}"
+    },
+    {
+      "name": "Remaining Money Destination",
+      "kind": "card",
+      "refersTo": "destination-remaining",
+      "description": "Green label and confirmation icon identify remaining monthly money.",
+      "html": "<div class=\"ds-remaining-destination\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg><div><span>Room to breathe</span><strong>$3,593</strong></div></div>",
+      "css": ".ds-remaining-destination{font-family:Manrope,sans-serif;display:inline-flex;gap:12px;align-items:center;border-radius:14px;background:#fff;color:#166953;padding:17px 13px;font-size:11px}.ds-remaining-destination>div{display:flex;flex-direction:column;gap:5px}.ds-remaining-destination strong{font-size:24px;letter-spacing:-.025em;font-variant-numeric:tabular-nums;font-weight:700}"
+    },
+    {
+      "name": "Savings Control States",
+      "kind": "button",
+      "refersTo": "savings-control",
+      "description": "The unpressed and pressed states of the monthly savings control; these previews are static.",
+      "html": "<div class=\"ds-control-states\"><button class=\"ds-savings-control\" type=\"button\" aria-pressed=\"false\">+ Save another $200</button><button class=\"ds-savings-control\" type=\"button\" aria-pressed=\"true\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg> Save another $200</button></div>",
+      "css": ".ds-control-states{display:flex;flex-wrap:wrap;gap:16px;background:#e8e9fc;padding:22px}.ds-savings-control{font-family:Manrope,sans-serif;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#20214a;padding:11px 13px;border:0;border-radius:100px;white-space:nowrap;font-size:11px;font-weight:700;cursor:pointer}.ds-savings-control[aria-pressed=\"true\"]{background:#4948c9;color:#fff}.ds-savings-control:focus-visible{outline:3px solid #4948c9;outline-offset:5px;}"
+    },
+    {
+      "name": "Agent Description",
+      "kind": "card",
+      "refersTo": "agent-row",
+      "description": "An open, separated agent description without a raised container.",
+      "html": "<article class=\"ds-agent\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"27\" height=\"27\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 7V5a2 2 0 0 1 2-2h2\"/><path d=\"M17 3h2a2 2 0 0 1 2 2v2\"/><path d=\"M21 17v2a2 2 0 0 1-2 2h-2\"/><path d=\"M7 21H5a2 2 0 0 1-2-2v-2\"/><path d=\"M7 12h10\"/></svg><h3>Sentinel</h3><strong>See the pressure points.</strong><p>Spot unusual spending and understand what is putting pressure on your finances.</p></article>",
+      "css": ".ds-agent{font-family:Manrope,sans-serif;padding-top:28px;border-top:1px solid #cfd3e6;color:#20214a}.ds-agent>svg{color:#4948c9}.ds-agent h3{font-size:23px;font-weight:700;margin:22px 0 8px;letter-spacing:-.02em}.ds-agent strong{font-size:14px;font-weight:700}.ds-agent p{color:#575b76;font-size:14px;line-height:1.8;margin:15px 0 0;max-width:35ch}@media(max-width:760px){.ds-agent h3{margin-top:16px}.ds-agent p{max-width:50ch}}"
+    },
+    {
+      "name": "Illustrative Money Route",
+      "kind": "custom",
+      "refersTo": "money-map",
+      "description": "The signature financial route; a static snapshot of the landing demo before an extra contribution.",
+      "html": "<div class=\"ds-map\" aria-label=\"Illustrative monthly money flow\"><div class=\"ds-map-header\"><span>Your money, connected</span><span class=\"ds-map-tag\">Illustrative demo</span></div><div class=\"ds-map-canvas\"><svg class=\"ds-map-connections\" viewBox=\"0 0 620 380\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><path d=\"M130 185 H245 Q265 185 265 165 V100 Q265 80 285 80 H410\"/><path d=\"M130 185 H410\"/><path d=\"M130 185 H245 Q265 185 265 205 V290 Q265 310 285 310 H410\"/><circle cx=\"265\" cy=\"185\" r=\"6\"/></svg><div class=\"ds-map-income\"><span class=\"ds-map-icon\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2\" y=\"6\" width=\"20\" height=\"12\" rx=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/></svg></span><span>Monthly income</span><strong>$8,500</strong><small>After tax</small></div><div class=\"ds-map-account\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10 18v-7\"/><path d=\"M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z\"/><path d=\"M14 18v-7\"/><path d=\"M18 18v-7\"/><path d=\"M3 22h18\"/><path d=\"M6 18v-7\"/></svg><span>Chequing</span></div><div class=\"ds-map-destination ds-map-spending\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 7h10v10\"/><path d=\"M7 17 17 7\"/></svg><div><span>Everyday spending</span><strong>$4,107</strong></div></div><div class=\"ds-map-destination ds-map-savings\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M17 7 7 17\"/><path d=\"M17 17H7V7\"/></svg><div><span>Savings &amp; investing</span><strong>$800</strong></div><span class=\"ds-map-dot\"></span></div><div class=\"ds-map-destination ds-map-remaining\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg><div><span>Room to breathe</span><strong>$3,593</strong></div></div></div></div>",
+      "css": ".ds-map{font-family:Manrope,sans-serif;background:#e8e9fc;color:#20214a;border-radius:24px;padding:25px;position:relative}.ds-map-header{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px;font-weight:700}.ds-map-tag{color:#575b76;font-size:11px;font-weight:500;padding:5px 8px;border:1px solid #babfe1;border-radius:6px}.ds-map-canvas{height:360px;position:relative;margin:10px -10px}.ds-map-connections{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.ds-map-connections path{fill:none;stroke:#a3a6d5;stroke-width:2}.ds-map-connections circle{fill:#4948c9}.ds-map-income{position:absolute;left:2%;top:37%;display:flex;flex-direction:column;gap:4px;align-items:flex-start;font-size:11px}.ds-map-income strong{font-size:25px;font-weight:700;letter-spacing:-.025em}.ds-map-income small{color:#575b76}.ds-map-icon{background:#4948c9;color:#fff;border-radius:12px;padding:11px;margin-bottom:8px}.ds-map-account{position:absolute;left:37%;top:36%;display:flex;align-items:center;flex-direction:column;gap:8px;border-radius:50%;background:#e8e9fc;padding:17px;font-size:11px;color:#4948c9}.ds-map-destination{position:absolute;right:0;display:flex;gap:12px;align-items:center;width:43%;border-radius:14px;background:#fff;padding:17px 13px;font-size:11px;box-sizing:border-box}.ds-map-destination>div{display:flex;flex-direction:column;gap:5px}.ds-map-destination strong{font-size:24px;font-weight:700;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.ds-map-spending{top:10%}.ds-map-savings{top:40%;background:#4948c9;color:#fff}.ds-map-remaining{top:73%;color:#166953}.ds-map-dot{position:absolute;left:-7px;height:14px;width:14px;border-radius:50%;background:#4948c9;border:3px solid #e8e9fc;box-sizing:border-box}@media(max-width:1050px){.ds-map{padding:20px}.ds-map-destination{padding:15px 9px}.ds-map-account{left:34%}}@media(max-width:760px){.ds-map-canvas{height:350px}}@media(max-width:400px){.ds-map{padding:16px}.ds-map-header{font-size:12px}.ds-map-income strong{font-size:21px}.ds-map-account{left:33%;padding:13px}.ds-map-destination{gap:8px;width:45%}.ds-map-destination strong{font-size:21px}.ds-map-destination span{font-size:10px}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Money Transit Map",
+    "overview": "Finco's public landing page makes financial relationships feel navigable. Indigo destinations, quiet routing lines, and readable amounts turn an abstract financial picture into a route someone can inspect. The atmosphere is open, precise, and approachable: large Manrope statements sit beside a concrete illustration, while generous space keeps supporting explanations calm.\n\nThis system applies only to `/` and `src/components/landing/`. Its light palette is scoped by the landing stylesheet. The financial graph, dashboard, authentication screens, and shared application tokens keep their existing design; this document does not authorize changing them. The shared Finco mark is recolored locally on the landing page. Page sequence and campaign copy belong in `.impeccable/surfaces/landing.md`, rather than becoming rules for every future surface.",
+    "keyCharacteristics": [
+      "Light canvas with indigo actions and lilac illustration surfaces.",
+      "One Manrope family, confident headlines, and legible financial amounts.",
+      "Flat surfaces with crisp routes and restrained borders.",
+      "Rounded action pills and distinct destination containers.",
+      "Deliberate interaction with no autonomous landing motion."
+    ],
+    "rules": [
+      {
+        "name": "The Landing Boundary Rule",
+        "body": "Apply these colors inside the landing surface only. Keep the node graph and shared application's existing tokens authoritative for their own screens.",
+        "section": "colors"
+      },
+      {
+        "name": "The Route Color Rule",
+        "body": "Indigo identifies an action or a meaningful point in the financial route. Route strokes stay quieter than destinations and amounts.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Destination Rule",
+        "body": "Amounts lead within each destination, and the label explains the amount beside it. Preserve tabular numerals when values can change.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Map Rule",
+        "body": "Use tonal surfaces and routing lines to establish hierarchy on this landing. A destination's color and content carry its importance.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Accounted Change Rule",
+        "body": "When the savings control changes the example, savings and remaining money update together while monthly income and spending stay consistent. The annual difference must follow that same monthly change; visual feedback follows the calculation.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** keep the landing palette and component rules scoped to `/` and its landing components.",
+      "**Do** pair financial route lines with readable destination labels and amounts.",
+      "**Do** use tabular numerals for values that change in place.",
+      "**Do** preserve visible keyboard focus and reduced-motion behavior.",
+      "**Do** identify illustrative financial examples as demos.",
+      "**Do** use flat tonal surfaces and open separators to keep explanations calm."
+    ],
+    "donts": [
+      "**Don't** replace shared dark application tokens or graph styling with this landing's light system.",
+      "**Don't** animate the landing route continuously; interaction should follow a deliberate action.",
+      "**Don't** turn every explanatory block into an enclosed card.",
+      "**Don't** treat compact diagram annotations as the default size for reading text.",
+      "**Don't** use color alone to explain a financial destination or changed amount."
+    ]
+  }
+}
