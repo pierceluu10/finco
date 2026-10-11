@@ -34,9 +34,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-
-# Local design verification
-.impeccable/review/
-.impeccable/mocks/
-.impeccable/build/
+# Local design-tool artifacts
+.impeccable/
