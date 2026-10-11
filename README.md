@@ -2,8 +2,25 @@
 
 Visualize money flow as an interactive node graph, monitor risks with specialized agents, simulate changes, and plan future goals.
 
-<img width="1512" height="825" alt="image" src="https://github.com/user-attachments/assets/f66cb97b-c999-475f-98b6-6c365f059aed" />
-<img width="1510" height="814" alt="image" src="https://github.com/user-attachments/assets/6be8bf19-86db-487f-b49c-291c9633a34e" />
+## Screenshots
+
+### Landing page
+
+A first look at how income flows through spending, savings and the amount left over.
+
+<img width="1200" alt="Finco landing page with a sample monthly money flow" src="docs/screenshots/landing.jpg" />
+
+### Financial ecosystem
+
+The demo graph connects income, accounts, expenses, debt, savings and investments.
+
+<img width="1200" alt="Finco demo financial graph with account nodes, money flows and dashboard metrics" src="docs/screenshots/ecosystem.jpg" />
+
+### Agent overview
+
+The landing page introduces Sentinel, Simulator and Planner.
+
+<img width="1200" alt="Finco landing page explaining the Sentinel, Simulator and Planner agents" src="docs/screenshots/agents.jpg" />
 
 
 ---
